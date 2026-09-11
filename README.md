@@ -32,13 +32,13 @@ Plataforma web institucional para diagnosticar, monitorear y mitigar la fatiga d
 ## Uso
 
 ```bash
+npm install
+
 # API (puerto 3001, crea el esquema y los datos demo en PostgreSQL)
-cd server && npm install
-echo 'DATABASE_URL=postgresql://usuario:clave@host/base?sslmode=require' > .env
-npm run dev
+echo 'DATABASE_URL=postgresql://usuario:clave@host/base?sslmode=require' > server/.env
+npm run api
 
 # Frontend (puerto 5173, proxy de /api hacia la API)
-npm install
 npm run dev      # servidor de desarrollo
 npm run build    # compilación de producción
 npm run lint     # eslint
@@ -52,13 +52,12 @@ Variables de entorno de la API:
 - `JWT_SECRETO`: recomendada en producción; si falta, se genera y guarda en la tabla `configuracion`.
 - `PORT` (o `PUERTO` en local): puerto de escucha, 3001 por defecto.
 
-## Despliegue en Render + Neon
+## Despliegue en Vercel + Neon
 
 1. Crear la base en [Neon](https://neon.tech) y copiar la cadena de conexión.
-2. Crear un Web Service en Render apuntando a este repositorio; `render.yaml` define build y arranque.
-3. Configurar `DATABASE_URL` y `JWT_SECRETO` como variables del servicio (nunca en el repositorio).
-4. Render inyecta `PORT`; el proceso sirve la API y el frontend compilado de `dist/`.
-5. Verificar `https://<servicio>.onrender.com/api/salud`.
+2. Importar el repositorio en Vercel; `vercel.json` compila el frontend a `dist/` y publica `api/index.js` como función serverless que monta la misma API Express.
+3. Configurar `DATABASE_URL` y `JWT_SECRETO` como variables de entorno del proyecto (nunca en el repositorio). `JWT_SECRETO` es obligatoria en Vercel para que las sesiones sobrevivan entre instancias.
+4. Verificar `https://<proyecto>.vercel.app/api/salud`.
 
 El esquema y los datos demo se crean automáticamente en el primer arranque si la base está vacía.
 

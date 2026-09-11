@@ -1,11 +1,17 @@
 import jwt from 'jsonwebtoken'
 import { secretoJwt, unaFila } from './db.js'
 
-const SECRETO = await secretoJwt()
 const VIGENCIA = '12h'
 
-export function firmarToken(usuario) {
-  return jwt.sign({ sub: usuario.id, rol: usuario.rol }, SECRETO, { expiresIn: VIGENCIA })
+let secretoEnCache = null
+
+async function secreto() {
+  if (!secretoEnCache) secretoEnCache = await secretoJwt()
+  return secretoEnCache
+}
+
+export async function firmarToken(usuario) {
+  return jwt.sign({ sub: usuario.id, rol: usuario.rol }, await secreto(), { expiresIn: VIGENCIA })
 }
 
 export async function autenticar(peticion, respuesta, siguiente) {
@@ -15,7 +21,7 @@ export async function autenticar(peticion, respuesta, siguiente) {
 
   let carga
   try {
-    carga = jwt.verify(token, SECRETO)
+    carga = jwt.verify(token, await secreto())
   } catch {
     return respuesta.status(401).json({ error: 'Sesión inválida o expirada' })
   }

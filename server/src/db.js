@@ -268,6 +268,17 @@ export async function inicializarDatos() {
   await registrarAuditoria(null, 'semilla', 'Datos de demostración creados')
 }
 
+let inicializacion = null
+
+export function baseLista() {
+  if (!inicializacion) inicializacion = inicializarDatos()
+  return inicializacion
+}
+
+export function reiniciarInicializacion() {
+  inicializacion = null
+}
+
 export async function leerAjustes() {
   const fila = await unaFila('SELECT datos FROM ajustes WHERE id = 1')
   return fila ? JSON.parse(fila.datos) : ajustesPorDefecto
