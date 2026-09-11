@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken'
-import { secretoJwt, unaFila } from './db.js'
+import { esCorreoAdmin, secretoJwt, unaFila } from './db.js'
 
 const VIGENCIA = '12h'
 
@@ -33,15 +33,13 @@ export async function autenticar(peticion, respuesta, siguiente) {
   return siguiente()
 }
 
-export function exigirRol(...roles) {
-  return (peticion, respuesta, siguiente) => {
-    if (!roles.includes(peticion.usuario.rol)) {
-      return respuesta.status(403).json({ error: 'No autorizado para esta operación' })
-    }
-    return siguiente()
-  }
+export function esAdministrador(usuario) {
+  return Boolean(usuario) && usuario.rol === 'admin' && esCorreoAdmin(usuario.correo)
 }
 
-export function puedeVerTodo(usuario) {
-  return usuario.rol !== 'piloto'
+export function exigirAdministrador(peticion, respuesta, siguiente) {
+  if (!esAdministrador(peticion.usuario)) {
+    return respuesta.status(403).json({ error: 'No autorizado para esta operación' })
+  }
+  return siguiente()
 }

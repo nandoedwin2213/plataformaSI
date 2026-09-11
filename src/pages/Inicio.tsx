@@ -41,8 +41,8 @@ export function Inicio() {
   const serieProyectada =
     proyeccion?.dias.map((dia) => ({ etiqueta: dia.fecha.slice(5), valor: dia.puntaje })) ?? []
 
-  const esMando = usuarioActual.rol !== 'piloto'
-  const pilotos = usuarios.filter((usuario) => usuario.rol === 'piloto' && usuario.activo)
+  const esMando = usuarioActual.rol === 'admin'
+  const pilotos = usuarios.filter((usuario) => usuario.rol === 'evaluado' && usuario.activo)
   const sinCheckinHoy = pilotos.filter(
     (piloto) => !checkins.some((item) => item.usuarioId === piloto.id && item.fecha === hoy),
   )

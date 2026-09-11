@@ -1,26 +1,64 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../store/contexto'
+import type { ModoAcceso } from '../lib/api'
 
-const cuentasDemo = [
-  { usuario: 'piloto', clave: 'piloto123', rol: 'Piloto' },
-  { usuario: 'operaciones', clave: 'ops123', rol: 'Jefe de operaciones' },
-  { usuario: 'medico', clave: 'med123', rol: 'Médico de aviación' },
-  { usuario: 'admin', clave: 'admin123', rol: 'Administrador' },
+const opciones: { modo: ModoAcceso; titulo: string; descripcion: string }[] = [
+  {
+    modo: 'evaluado',
+    titulo: 'Ingresar como Personal Evaluado',
+    descripcion: 'Ficha personal, check-in diario y evaluaciones de fatiga',
+  },
+  {
+    modo: 'admin',
+    titulo: 'Ingresar como Administrador',
+    descripcion: 'Panel institucional, personal, ajustes y auditoría',
+  },
 ]
 
 export function Login() {
-  const { iniciarSesion, ajustes, sinConexion } = useApp()
+  const { solicitarCodigo, ingresarConCodigo, ajustes, sinConexion } = useApp()
   const navegar = useNavigate()
-  const [usuario, setUsuario] = useState('')
-  const [clave, setClave] = useState('')
+  const [modo, setModo] = useState<ModoAcceso | null>(null)
+  const [etapa, setEtapa] = useState<'correo' | 'codigo'>('correo')
+  const [correo, setCorreo] = useState('')
+  const [codigo, setCodigo] = useState('')
+  const [aviso, setAviso] = useState('')
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
 
-  const enviar = async (evento: React.FormEvent) => {
+  const reiniciar = () => {
+    setModo(null)
+    setEtapa('correo')
+    setCodigo('')
+    setAviso('')
+    setError('')
+  }
+
+  const pedirCodigo = async (evento: React.FormEvent) => {
+    evento.preventDefault()
+    if (!modo) return
+    setEnviando(true)
+    setError('')
+    const { datos, error: fallo } = await solicitarCodigo(correo, modo)
+    setEnviando(false)
+    if (fallo || !datos) {
+      setError(fallo ?? 'No se pudo enviar el código')
+      return
+    }
+    setEtapa('codigo')
+    setAviso(
+      datos.codigo
+        ? `Código de prueba: ${datos.codigo} (válido ${datos.minutos} minutos)`
+        : `Enviamos un código de ${datos.minutos} minutos a ${correo}.`,
+    )
+  }
+
+  const verificar = async (evento: React.FormEvent) => {
     evento.preventDefault()
     setEnviando(true)
-    const fallo = await iniciarSesion(usuario, clave)
+    setError('')
+    const fallo = await ingresarConCodigo(correo, codigo)
     setEnviando(false)
     if (fallo) {
       setError(fallo)
@@ -38,77 +76,107 @@ export function Login() {
             Plataforma de gestión de riesgos de fatiga
           </h1>
           <p className="mt-2 text-sm text-slate-400">
-            Diagnóstico, seguimiento y mitigación de la fatiga del personal militar
+            Acceso seguro con código de un solo uso enviado a tu correo institucional
           </p>
         </div>
 
         {sinConexion && (
           <p className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-300">
-            No hay conexión con la API de la plataforma. Levanta el servidor con <code>npm start</code> en la
-            carpeta <code>server</code>.
+            No hay conexión con la API de la plataforma.
           </p>
         )}
 
-        <form className="card space-y-4" onSubmit={(evento) => void enviar(evento)}>
-          <div>
-            <label className="label" htmlFor="usuario">
-              Usuario
-            </label>
-            <input
-              id="usuario"
-              className="input"
-              value={usuario}
-              autoComplete="username"
-              onChange={(evento) => setUsuario(evento.target.value)}
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="clave">
-              Contraseña
-            </label>
-            <input
-              id="clave"
-              type="password"
-              className="input"
-              value={clave}
-              autoComplete="current-password"
-              onChange={(evento) => setClave(evento.target.value)}
-            />
-          </div>
-          {error && <p className="text-sm text-red-400">{error}</p>}
-          <button type="submit" className="btn-primary w-full" disabled={enviando}>
-            {enviando ? 'Verificando…' : 'Ingresar'}
-          </button>
-        </form>
-
-        <div className="card mt-6">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-cyan-400">
-            Cuentas de demostración
-          </p>
-          <ul className="space-y-2 text-sm text-slate-300">
-            {cuentasDemo.map((cuenta) => (
-              <li key={cuenta.usuario} className="flex items-center justify-between gap-3">
-                <span>
-                  <span className="font-mono text-cyan-300">{cuenta.usuario}</span> / {cuenta.clave}
-                </span>
-                <button
-                  type="button"
-                  className="text-xs font-semibold text-cyan-400 hover:underline"
-                  onClick={() => {
-                    setUsuario(cuenta.usuario)
-                    setClave(cuenta.clave)
-                  }}
-                >
-                  {cuenta.rol}
-                </button>
-              </li>
+        {!modo && (
+          <div className="space-y-3">
+            {opciones.map((opcion) => (
+              <button
+                key={opcion.modo}
+                type="button"
+                className="card w-full text-left transition hover:border-cyan-400/60"
+                onClick={() => {
+                  setModo(opcion.modo)
+                  setError('')
+                }}
+              >
+                <p className="text-base font-semibold text-white">{opcion.titulo}</p>
+                <p className="mt-1 text-sm text-slate-400">{opcion.descripcion}</p>
+              </button>
             ))}
-          </ul>
-          <p className="mt-3 text-xs text-slate-500">
-            Los datos se guardan en la base PostgreSQL del servidor, con contraseñas hasheadas y sesión JWT. Para
-            producción institucional falta respaldo centralizado y contraseñas propias de cada usuario.
-          </p>
-        </div>
+          </div>
+        )}
+
+        {modo && (
+          <form
+            className="card space-y-4"
+            onSubmit={(evento) => void (etapa === 'correo' ? pedirCodigo(evento) : verificar(evento))}
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-cyan-300">
+                {modo === 'admin' ? 'Administrador' : 'Personal evaluado'}
+              </p>
+              <button type="button" className="text-xs text-slate-400 hover:underline" onClick={reiniciar}>
+                Cambiar
+              </button>
+            </div>
+
+            <div>
+              <label className="label" htmlFor="correo">
+                Correo electrónico
+              </label>
+              <input
+                id="correo"
+                type="email"
+                className="input"
+                value={correo}
+                autoComplete="email"
+                disabled={etapa === 'codigo'}
+                onChange={(evento) => setCorreo(evento.target.value)}
+              />
+            </div>
+
+            {etapa === 'codigo' && (
+              <div>
+                <label className="label" htmlFor="codigo">
+                  Código de verificación
+                </label>
+                <input
+                  id="codigo"
+                  inputMode="numeric"
+                  className="input tracking-[0.5em]"
+                  value={codigo}
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  onChange={(evento) => setCodigo(evento.target.value.replace(/\D/g, ''))}
+                />
+              </div>
+            )}
+
+            {aviso && <p className="text-sm text-slate-300">{aviso}</p>}
+            {error && <p className="text-sm text-red-400">{error}</p>}
+
+            <button type="submit" className="btn-primary w-full" disabled={enviando}>
+              {enviando
+                ? 'Procesando…'
+                : etapa === 'correo'
+                  ? 'Enviar código de acceso'
+                  : 'Verificar e ingresar'}
+            </button>
+
+            {etapa === 'codigo' && (
+              <button
+                type="button"
+                className="w-full text-xs text-slate-400 hover:underline"
+                onClick={() => {
+                  setEtapa('correo')
+                  setCodigo('')
+                  setAviso('')
+                }}
+              >
+                Usar otro correo o reenviar
+              </button>
+            )}
+          </form>
+        )}
       </div>
     </div>
   )

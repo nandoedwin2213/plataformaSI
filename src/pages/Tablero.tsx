@@ -28,7 +28,8 @@ export function Tablero() {
   const personal = useMemo(
     () =>
       usuarios.filter(
-        (usuario) => usuario.rol === 'piloto' && (unidadFiltro === 'todas' || usuario.unidad === unidadFiltro),
+        (usuario) =>
+          usuario.rol === 'evaluado' && (unidadFiltro === 'todas' || usuario.unidad === unidadFiltro),
       ),
     [usuarios, unidadFiltro],
   )

@@ -3,11 +3,11 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
 import cors from 'cors'
-import bcrypt from 'bcryptjs'
-import { autenticar, exigirRol, firmarToken, puedeVerTodo } from './auth.js'
+import { autenticar, esAdministrador, exigirAdministrador, firmarToken } from './auth.js'
 import {
   baseLista,
   consultar,
+  esCorreoAdmin,
   leerAjustes,
   reiniciarInicializacion,
   nuevoId,
@@ -15,6 +15,18 @@ import {
   registrarAuditoria,
   unaFila,
 } from './db.js'
+import {
+  MINUTOS_VIGENCIA,
+  crearCodigo,
+  esCorreoDePrueba,
+  limiteAlcanzado,
+  limpiarCodigosVencidos,
+  normalizarCorreo,
+  solicitudesRecientes,
+  usuarioPorCorreo,
+  validarCodigo,
+} from './accesoCorreo.js'
+import { correoConfigurado, enviarCodigo } from './correo.js'
 
 const app = express()
 app.use(cors())
@@ -32,6 +44,7 @@ function usuarioPublico(fila) {
   return {
     id: fila.id,
     usuario: fila.usuario,
+    correo: fila.correo ?? '',
     nombre: fila.nombre,
     grado: fila.grado,
     unidad: fila.unidad,
@@ -79,19 +92,76 @@ app.get(
 )
 
 app.post(
-  '/api/sesion',
+  '/api/acceso/codigo',
   asincrono(async (peticion, respuesta) => {
-    const { usuario, clave } = peticion.body ?? {}
-    if (typeof usuario !== 'string' || typeof clave !== 'string') {
-      return respuesta.status(400).json({ error: 'Usuario y contraseña requeridos' })
+    const correo = normalizarCorreo(peticion.body?.correo)
+    const modo = peticion.body?.modo === 'admin' ? 'admin' : 'evaluado'
+    if (!correo) return respuesta.status(400).json({ error: 'Correo electrónico inválido' })
+
+    if (modo === 'admin' && !esCorreoAdmin(correo)) {
+      await registrarAuditoria(null, 'acceso_admin_denegado', '')
+      return respuesta.status(403).json({ error: 'Ese correo no está autorizado como administrador' })
     }
-    const fila = await unaFila('SELECT * FROM usuarios WHERE lower(usuario) = lower($1)', [usuario.trim()])
-    if (!fila || !fila.activo || !bcrypt.compareSync(clave, fila.clave_hash)) {
-      await registrarAuditoria(fila?.id ?? null, 'login_fallido', usuario)
-      return respuesta.status(401).json({ error: 'Credenciales inválidas' })
+    if (modo === 'evaluado' && esCorreoAdmin(correo)) {
+      return respuesta
+        .status(400)
+        .json({ error: 'Ese correo corresponde al administrador; ingresa por la opción de administrador' })
     }
-    await registrarAuditoria(fila.id, 'login', '')
-    return respuesta.json({ token: await firmarToken(fila), usuario: usuarioPublico(fila) })
+
+    const existente = await unaFila('SELECT activo FROM usuarios WHERE lower(correo) = $1', [correo])
+    if (existente && !existente.activo) {
+      return respuesta.status(403).json({ error: 'Esta cuenta está desactivada' })
+    }
+
+    if (limiteAlcanzado(await solicitudesRecientes(correo))) {
+      return respuesta
+        .status(429)
+        .json({ error: 'Demasiadas solicitudes de código; espera unos minutos antes de reintentar' })
+    }
+
+    const rol = esCorreoAdmin(correo) ? 'admin' : 'evaluado'
+    const codigo = await crearCodigo(correo, rol)
+    await limpiarCodigosVencidos()
+
+    if (esCorreoDePrueba(correo)) {
+      await registrarAuditoria(null, 'codigo_prueba', '')
+      return respuesta.json({ enviado: false, minutos: MINUTOS_VIGENCIA, codigo })
+    }
+
+    if (!correoConfigurado()) {
+      return respuesta.status(503).json({ error: 'El envío de códigos no está configurado en el servidor' })
+    }
+
+    try {
+      await enviarCodigo(correo, codigo, MINUTOS_VIGENCIA)
+    } catch (error) {
+      console.error('Fallo al enviar el código de acceso:', error.message)
+      return respuesta.status(502).json({ error: 'No se pudo enviar el código; intenta nuevamente' })
+    }
+
+    await registrarAuditoria(null, 'codigo_enviado', rol)
+    return respuesta.json({ enviado: true, minutos: MINUTOS_VIGENCIA })
+  }),
+)
+
+app.post(
+  '/api/acceso/verificar',
+  asincrono(async (peticion, respuesta) => {
+    const correo = normalizarCorreo(peticion.body?.correo)
+    const codigo = typeof peticion.body?.codigo === 'string' ? peticion.body.codigo.trim() : ''
+    if (!correo) return respuesta.status(400).json({ error: 'Correo electrónico inválido' })
+
+    const resultado = await validarCodigo(correo, codigo)
+    if (resultado.error) {
+      await registrarAuditoria(null, 'acceso_fallido', '')
+      return respuesta.status(401).json({ error: resultado.error })
+    }
+
+    const usuario = await usuarioPorCorreo(correo)
+    if (!usuario.activo) return respuesta.status(403).json({ error: 'Esta cuenta está desactivada' })
+
+    await registrarAuditoria(usuario.id, 'acceso', usuario.rol)
+    return respuesta.json({ token: await firmarToken(usuario), usuario: usuarioPublico(usuario) })
   }),
 )
 
@@ -101,11 +171,20 @@ app.get(
   asincrono(async (peticion, respuesta) => respuesta.json(usuarioPublico(peticion.usuario))),
 )
 
+app.post(
+  '/api/salir',
+  asincrono(autenticar),
+  asincrono(async (peticion, respuesta) => {
+    await registrarAuditoria(peticion.usuario.id, 'cierre_sesion', '')
+    respuesta.status(204).end()
+  }),
+)
+
 app.get(
   '/api/usuarios',
   asincrono(autenticar),
   asincrono(async (peticion, respuesta) => {
-    const filas = puedeVerTodo(peticion.usuario)
+    const filas = esAdministrador(peticion.usuario)
       ? await consultar('SELECT * FROM usuarios ORDER BY nombre')
       : [peticion.usuario]
     respuesta.json(filas.map(usuarioPublico))
@@ -115,38 +194,35 @@ app.get(
 app.post(
   '/api/usuarios',
   asincrono(autenticar),
-  exigirRol('operaciones', 'admin'),
+  exigirAdministrador,
   asincrono(async (peticion, respuesta) => {
-    const { usuario, clave, nombre, grado, unidad, rol, perfil } = peticion.body ?? {}
-    if (!usuario?.trim() || !clave || !nombre?.trim()) {
-      return respuesta.status(400).json({ error: 'Usuario, contraseña y nombre son obligatorios' })
+    const { nombre, grado, unidad, perfil } = peticion.body ?? {}
+    const correo = normalizarCorreo(peticion.body?.correo)
+    if (!correo) return respuesta.status(400).json({ error: 'Correo electrónico inválido' })
+    if (esCorreoAdmin(correo)) {
+      return respuesta.status(403).json({ error: 'El correo del administrador ya está reservado' })
     }
-    if (!['piloto', 'medico', 'operaciones', 'admin'].includes(rol)) {
-      return respuesta.status(400).json({ error: 'Rol inválido' })
-    }
-    if (rol === 'admin' && peticion.usuario.rol !== 'admin') {
-      return respuesta.status(403).json({ error: 'Solo un administrador puede crear administradores' })
-    }
-    const existe = await unaFila('SELECT 1 FROM usuarios WHERE lower(usuario) = lower($1)', [usuario.trim()])
-    if (existe) return respuesta.status(409).json({ error: 'Ese nombre de usuario ya existe' })
+    if (!nombre?.trim()) return respuesta.status(400).json({ error: 'El nombre es obligatorio' })
+
+    const existe = await unaFila('SELECT 1 FROM usuarios WHERE lower(correo) = $1', [correo])
+    if (existe) return respuesta.status(409).json({ error: 'Ese correo ya está registrado' })
 
     const id = nuevoId()
     await pool.query(
-      `INSERT INTO usuarios (id, usuario, clave_hash, nombre, grado, unidad, rol, activo, perfil, creado_en)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,TRUE,$8,$9)`,
+      `INSERT INTO usuarios (id, usuario, clave_hash, correo, nombre, grado, unidad, rol, activo, perfil, creado_en)
+       VALUES ($1,$2,NULL,$3,$4,$5,$6,'evaluado',TRUE,$7,$8)`,
       [
         id,
-        usuario.trim(),
-        bcrypt.hashSync(clave, 10),
+        correo,
+        correo,
         nombre.trim(),
         grado ?? '',
         unidad ?? '',
-        rol,
         JSON.stringify(perfil ?? {}),
         new Date().toISOString(),
       ],
     )
-    await registrarAuditoria(peticion.usuario.id, 'alta_usuario', usuario.trim())
+    await registrarAuditoria(peticion.usuario.id, 'alta_usuario', id)
     const creado = await unaFila('SELECT * FROM usuarios WHERE id = $1', [id])
     return respuesta.status(201).json(usuarioPublico(creado))
   }),
@@ -160,30 +236,23 @@ app.put(
     if (!destino) return respuesta.status(404).json({ error: 'Usuario no encontrado' })
 
     const esPropio = destino.id === peticion.usuario.id
-    const esGestor = ['operaciones', 'admin'].includes(peticion.usuario.rol)
+    const esGestor = esAdministrador(peticion.usuario)
     if (!esPropio && !esGestor) return respuesta.status(403).json({ error: 'No autorizado' })
 
-    const { nombre, grado, unidad, rol, activo, perfil, clave } = peticion.body ?? {}
+    const { nombre, grado, unidad, activo, perfil } = peticion.body ?? {}
     const cambios = {
       nombre: nombre?.trim() || destino.nombre,
-      grado: grado ?? destino.grado,
-      unidad: unidad ?? destino.unidad,
+      grado: typeof grado === 'string' ? grado.slice(0, 80) : destino.grado,
+      unidad: typeof unidad === 'string' ? unidad.slice(0, 120) : destino.unidad,
       perfil: perfil ? JSON.stringify(perfil) : destino.perfil,
-      rol: esGestor && rol ? rol : destino.rol,
-      activo: esGestor && typeof activo === 'boolean' ? activo : destino.activo,
+      activo:
+        esGestor && typeof activo === 'boolean' && destino.rol !== 'admin' ? activo : destino.activo,
     }
     await pool.query(
-      'UPDATE usuarios SET nombre = $1, grado = $2, unidad = $3, perfil = $4, rol = $5, activo = $6 WHERE id = $7',
-      [cambios.nombre, cambios.grado, cambios.unidad, cambios.perfil, cambios.rol, cambios.activo, destino.id],
+      'UPDATE usuarios SET nombre = $1, grado = $2, unidad = $3, perfil = $4, activo = $5 WHERE id = $6',
+      [cambios.nombre, cambios.grado, cambios.unidad, cambios.perfil, cambios.activo, destino.id],
     )
-
-    if (clave && (esPropio || peticion.usuario.rol === 'admin')) {
-      await pool.query('UPDATE usuarios SET clave_hash = $1 WHERE id = $2', [
-        bcrypt.hashSync(clave, 10),
-        destino.id,
-      ])
-    }
-    await registrarAuditoria(peticion.usuario.id, 'edita_usuario', destino.usuario)
+    await registrarAuditoria(peticion.usuario.id, 'edita_usuario', destino.id)
     const actualizado = await unaFila('SELECT * FROM usuarios WHERE id = $1', [destino.id])
     return respuesta.json(usuarioPublico(actualizado))
   }),
@@ -192,12 +261,12 @@ app.put(
 app.delete(
   '/api/usuarios/:id',
   asincrono(autenticar),
-  exigirRol('admin'),
+  exigirAdministrador,
   asincrono(async (peticion, respuesta) => {
     if (peticion.params.id === peticion.usuario.id) {
       return respuesta.status(400).json({ error: 'No puedes eliminar tu propia cuenta' })
     }
-    await pool.query('DELETE FROM usuarios WHERE id = $1', [peticion.params.id])
+    await pool.query("DELETE FROM usuarios WHERE id = $1 AND rol <> 'admin'", [peticion.params.id])
     await registrarAuditoria(peticion.usuario.id, 'baja_usuario', peticion.params.id)
     return respuesta.status(204).end()
   }),
@@ -207,7 +276,7 @@ app.get(
   '/api/checkins',
   asincrono(autenticar),
   asincrono(async (peticion, respuesta) => {
-    const filas = puedeVerTodo(peticion.usuario)
+    const filas = esAdministrador(peticion.usuario)
       ? await consultar('SELECT * FROM checkins ORDER BY fecha DESC')
       : await consultar('SELECT * FROM checkins WHERE usuario_id = $1 ORDER BY fecha DESC', [
           peticion.usuario.id,
@@ -275,7 +344,7 @@ app.get(
   '/api/registros',
   asincrono(autenticar),
   asincrono(async (peticion, respuesta) => {
-    const filas = puedeVerTodo(peticion.usuario)
+    const filas = esAdministrador(peticion.usuario)
       ? await consultar('SELECT * FROM registros ORDER BY creado_en DESC')
       : await consultar('SELECT * FROM registros WHERE usuario_id = $1 ORDER BY creado_en DESC', [
           peticion.usuario.id,
@@ -292,7 +361,7 @@ app.post(
     if (!evaluacion || !resultado) {
       return respuesta.status(400).json({ error: 'Evaluación y resultado son obligatorios' })
     }
-    const destino = puedeVerTodo(peticion.usuario) && usuarioId ? usuarioId : peticion.usuario.id
+    const destino = esAdministrador(peticion.usuario) && usuarioId ? usuarioId : peticion.usuario.id
     const existe = await unaFila('SELECT 1 FROM usuarios WHERE id = $1', [destino])
     if (!existe) return respuesta.status(400).json({ error: 'Usuario destino inexistente' })
 
@@ -314,7 +383,7 @@ app.delete(
     const fila = await unaFila('SELECT * FROM registros WHERE id = $1', [peticion.params.id])
     if (!fila) return respuesta.status(404).json({ error: 'Registro no encontrado' })
     const esPropio = fila.usuario_id === peticion.usuario.id
-    if (!esPropio && !['medico', 'admin'].includes(peticion.usuario.rol)) {
+    if (!esPropio && !esAdministrador(peticion.usuario)) {
       return respuesta.status(403).json({ error: 'No autorizado' })
     }
     await pool.query('DELETE FROM registros WHERE id = $1', [fila.id])
@@ -332,7 +401,7 @@ app.get(
 app.put(
   '/api/ajustes',
   asincrono(autenticar),
-  exigirRol('admin'),
+  exigirAdministrador,
   asincrono(async (peticion, respuesta) => {
     const actuales = await leerAjustes()
     const nuevos = { ...actuales, ...(peticion.body ?? {}) }
@@ -349,7 +418,7 @@ app.put(
 app.get(
   '/api/auditoria',
   asincrono(autenticar),
-  exigirRol('admin'),
+  exigirAdministrador,
   asincrono(async (_peticion, respuesta) => {
     const filas = await consultar('SELECT * FROM auditoria ORDER BY creado_en DESC LIMIT 200')
     respuesta.json(
@@ -367,14 +436,15 @@ app.get(
 app.post(
   '/api/reiniciar',
   asincrono(autenticar),
-  exigirRol('admin'),
-  asincrono(async (peticion, respuesta) => {
-    const administrador = peticion.usuario.usuario
-    await pool.query('TRUNCATE registros, checkins, auditoria, usuarios RESTART IDENTITY CASCADE')
+  exigirAdministrador,
+  asincrono(async (_peticion, respuesta) => {
+    await pool.query(
+      'TRUNCATE registros, checkins, auditoria, usuarios, codigos_acceso RESTART IDENTITY CASCADE',
+    )
     await pool.query('DELETE FROM ajustes')
     reiniciarInicializacion()
     await baseLista()
-    const nuevoAdmin = await unaFila('SELECT id FROM usuarios WHERE usuario = $1', [administrador])
+    const nuevoAdmin = await unaFila("SELECT id FROM usuarios WHERE rol = 'admin'")
     await registrarAuditoria(
       nuevoAdmin?.id ?? null,
       'reinicio',

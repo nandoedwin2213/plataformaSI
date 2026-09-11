@@ -1,5 +1,5 @@
 import type { RegistroHistorial } from '../domain/types'
-import type { AjustesInstitucionales, CheckIn, Rol, Usuario } from '../domain/usuarios'
+import type { AjustesInstitucionales, CheckIn, Usuario } from '../domain/usuarios'
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 const CLAVE_TOKEN = 'fae-fatiga-token'
@@ -43,13 +43,19 @@ async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
 }
 
 export interface DatosNuevoUsuario {
-  usuario: string
-  clave: string
+  correo: string
   nombre: string
   grado: string
   unidad: string
-  rol: Rol
   perfil: Usuario['perfil']
+}
+
+export type ModoAcceso = 'evaluado' | 'admin'
+
+export interface RespuestaCodigo {
+  enviado: boolean
+  minutos: number
+  codigo?: string
 }
 
 export type DatosCheckIn = Omit<CheckIn, 'id' | 'usuarioId' | 'creadoEn'>
@@ -64,16 +70,22 @@ export interface RegistroAuditoria {
 
 export const api = {
   salud: () => pedir<{ estado: string }>('/api/salud'),
-  entrar: (usuario: string, clave: string) =>
-    pedir<{ token: string; usuario: Usuario }>('/api/sesion', {
+  solicitarCodigo: (correo: string, modo: ModoAcceso) =>
+    pedir<RespuestaCodigo>('/api/acceso/codigo', {
       method: 'POST',
-      body: JSON.stringify({ usuario, clave }),
+      body: JSON.stringify({ correo, modo }),
+    }),
+  verificarCodigo: (correo: string, codigo: string) =>
+    pedir<{ token: string; usuario: Usuario }>('/api/acceso/verificar', {
+      method: 'POST',
+      body: JSON.stringify({ correo, codigo }),
     }),
   sesion: () => pedir<Usuario>('/api/sesion'),
+  salir: () => pedir<void>('/api/salir', { method: 'POST' }),
   usuarios: () => pedir<Usuario[]>('/api/usuarios'),
   crearUsuario: (datos: DatosNuevoUsuario) =>
     pedir<Usuario>('/api/usuarios', { method: 'POST', body: JSON.stringify(datos) }),
-  actualizarUsuario: (id: string, datos: Partial<Usuario> & { clave?: string }) =>
+  actualizarUsuario: (id: string, datos: Partial<Usuario>) =>
     pedir<Usuario>(`/api/usuarios/${id}`, { method: 'PUT', body: JSON.stringify(datos) }),
   eliminarUsuario: (id: string) => pedir<void>(`/api/usuarios/${id}`, { method: 'DELETE' }),
   checkins: () => pedir<CheckIn[]>('/api/checkins'),

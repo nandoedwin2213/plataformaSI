@@ -2,7 +2,15 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import type { RegistroHistorial } from '../domain/types'
 import type { AjustesInstitucionales, CheckIn, Usuario } from '../domain/usuarios'
 import { ajustesPorDefecto } from '../domain/usuarios'
-import { ErrorApi, api, guardarToken, leerToken, type DatosCheckIn, type DatosNuevoUsuario } from '../lib/api'
+import {
+  ErrorApi,
+  api,
+  guardarToken,
+  leerToken,
+  type DatosCheckIn,
+  type DatosNuevoUsuario,
+  type ModoAcceso,
+} from '../lib/api'
 import { ContextoApp, type EstadoApp } from './contexto'
 
 function mensajeError(error: unknown): string {
@@ -56,10 +64,18 @@ export function ProveedorApp({ children }: { children: ReactNode }) {
     void iniciar()
   }, [cargarDatos])
 
-  const iniciarSesion = useCallback(
-    async (nombreUsuario: string, clave: string) => {
+  const solicitarCodigo = useCallback(async (correo: string, modo: ModoAcceso) => {
+    try {
+      return { datos: await api.solicitarCodigo(correo, modo), error: null }
+    } catch (error) {
+      return { datos: null, error: mensajeError(error) }
+    }
+  }, [])
+
+  const ingresarConCodigo = useCallback(
+    async (correo: string, codigo: string) => {
       try {
-        const { token, usuario } = await api.entrar(nombreUsuario, clave)
+        const { token, usuario } = await api.verificarCodigo(correo, codigo)
         guardarToken(token)
         setUsuarioActual(usuario)
         setSinConexion(false)
@@ -73,6 +89,7 @@ export function ProveedorApp({ children }: { children: ReactNode }) {
   )
 
   const cerrarSesion = useCallback(() => {
+    void api.salir().catch(() => undefined)
     guardarToken(null)
     setUsuarioActual(null)
     setUsuarios([])
@@ -112,7 +129,7 @@ export function ProveedorApp({ children }: { children: ReactNode }) {
   }, [])
 
   const actualizarUsuario = useCallback(
-    async (id: string, datos: Partial<Usuario> & { clave?: string }) => {
+    async (id: string, datos: Partial<Usuario>) => {
       const actualizado = await api.actualizarUsuario(id, datos)
       setUsuarios((previos) => previos.map((item) => (item.id === id ? actualizado : item)))
       setUsuarioActual((previo) => (previo && previo.id === id ? actualizado : previo))
@@ -152,7 +169,8 @@ export function ProveedorApp({ children }: { children: ReactNode }) {
       checkins,
       ajustes,
       sinConexion,
-      iniciarSesion,
+      solicitarCodigo,
+      ingresarConCodigo,
       cerrarSesion,
       guardarRegistro,
       eliminarRegistro,
@@ -170,7 +188,8 @@ export function ProveedorApp({ children }: { children: ReactNode }) {
       checkins,
       ajustes,
       sinConexion,
-      iniciarSesion,
+      solicitarCodigo,
+      ingresarConCodigo,
       cerrarSesion,
       guardarRegistro,
       eliminarRegistro,
