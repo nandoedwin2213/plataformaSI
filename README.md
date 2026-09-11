@@ -3,7 +3,7 @@
 Plataforma web institucional para diagnosticar, monitorear y mitigar la fatiga del personal militar.
 
 - **Frontend**: React + TypeScript + Vite + Tailwind + React Router.
-- **Backend** (`server/`): API Express con base SQLite, contraseñas hasheadas con bcrypt, sesión JWT, control de acceso por rol y bitácora de auditoría.
+- **Backend** (`server/`): API Express con base PostgreSQL (Neon u otro proveedor), contraseñas hasheadas con bcrypt, sesión JWT, control de acceso por rol y bitácora de auditoría.
 
 ## Módulos
 
@@ -32,8 +32,10 @@ Plataforma web institucional para diagnosticar, monitorear y mitigar la fatiga d
 ## Uso
 
 ```bash
-# API (puerto 3001, crea server/datos/fatiga.db con datos demo)
-cd server && npm install && npm start
+# API (puerto 3001, crea el esquema y los datos demo en PostgreSQL)
+cd server && npm install
+echo 'DATABASE_URL=postgresql://usuario:clave@host/base?sslmode=require' > .env
+npm run dev
 
 # Frontend (puerto 5173, proxy de /api hacia la API)
 npm install
@@ -44,7 +46,21 @@ npm run lint     # eslint
 
 Con `npm run build` hecho, la API también sirve el frontend compilado desde `dist/`, de modo que un despliegue institucional puede correr en un solo proceso.
 
-Variables de entorno de la API: `PUERTO`, `RUTA_DATOS` (carpeta de la base) y `JWT_SECRETO` (si no se define, se genera y guarda en `server/datos/jwt.secreto`).
+Variables de entorno de la API:
+
+- `DATABASE_URL` (obligatoria): cadena de conexión PostgreSQL.
+- `JWT_SECRETO`: recomendada en producción; si falta, se genera y guarda en la tabla `configuracion`.
+- `PORT` (o `PUERTO` en local): puerto de escucha, 3001 por defecto.
+
+## Despliegue en Render + Neon
+
+1. Crear la base en [Neon](https://neon.tech) y copiar la cadena de conexión.
+2. Crear un Web Service en Render apuntando a este repositorio; `render.yaml` define build y arranque.
+3. Configurar `DATABASE_URL` y `JWT_SECRETO` como variables del servicio (nunca en el repositorio).
+4. Render inyecta `PORT`; el proceso sirve la API y el frontend compilado de `dist/`.
+5. Verificar `https://<servicio>.onrender.com/api/salud`.
+
+El esquema y los datos demo se crean automáticamente en el primer arranque si la base está vacía.
 
 ## Aviso
 

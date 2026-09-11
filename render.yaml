@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: plataforma-fatiga-fae
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci && npm run build && cd server && npm ci
+    startCommand: node server/src/index.js
+    healthCheckPath: /api/salud
+    envVars:
+      - key: NODE_VERSION
+        value: 20.19.0
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRETO
+        sync: false

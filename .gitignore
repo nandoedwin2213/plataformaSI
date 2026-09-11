@@ -14,6 +14,8 @@ dist-ssr
 
 # Datos y secretos de la API
 server/datos
+.env
+server/.env
 
 # Editor directories and files
 .vscode/*
