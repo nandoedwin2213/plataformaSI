@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply min-h-screen bg-slate-950 text-slate-200 antialiased;
+    background-image:
+      radial-gradient(60rem 40rem at 110% -10%, rgba(34, 211, 238, 0.12), transparent),
+      radial-gradient(50rem 35rem at -10% 0%, rgba(56, 189, 248, 0.1), transparent);
+    background-attachment: fixed;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-white/10 bg-white/[0.04] p-5 shadow-lg shadow-black/20 backdrop-blur;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium text-slate-300;
+  }
+  .input {
+    @apply w-full rounded-lg border border-white/15 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/25;
+  }
+  .btn-primary {
+    @apply rounded-lg bg-gradient-to-r from-cyan-500 to-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:from-cyan-400 hover:to-sky-400 disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10;
+  }
+  .section-title {
+    @apply mb-4 text-sm font-bold uppercase tracking-[0.15em] text-cyan-300;
+  }
+}
+
+@media print {
+  body {
+    @apply bg-white text-slate-900;
+    background-image: none;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
