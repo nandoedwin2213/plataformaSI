@@ -221,7 +221,14 @@ app.post(
   asincrono(autenticar),
   asincrono(async (peticion, respuesta) => {
     const cuerpo = peticion.body ?? {}
-    const fecha = typeof cuerpo.fecha === 'string' ? cuerpo.fecha : new Date().toISOString().slice(0, 10)
+    const hoy = new Date().toISOString().slice(0, 10)
+    const fecha = typeof cuerpo.fecha === 'string' ? cuerpo.fecha : hoy
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      return respuesta.status(400).json({ error: 'Fecha inválida' })
+    }
+    if (fecha > hoy) {
+      return respuesta.status(400).json({ error: 'No se pueden registrar check-ins con fecha futura' })
+    }
 
     await pool.query(
       `INSERT INTO checkins

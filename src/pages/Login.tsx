@@ -105,8 +105,8 @@ export function Login() {
             ))}
           </ul>
           <p className="mt-3 text-xs text-slate-500">
-            Los datos se guardan en la base SQLite del servidor, con contraseñas hasheadas y sesión JWT. Para
-            producción institucional falta HTTPS, respaldo centralizado y contraseñas propias de cada usuario.
+            Los datos se guardan en la base PostgreSQL del servidor, con contraseñas hasheadas y sesión JWT. Para
+            producción institucional falta respaldo centralizado y contraseñas propias de cada usuario.
           </p>
         </div>
       </div>
