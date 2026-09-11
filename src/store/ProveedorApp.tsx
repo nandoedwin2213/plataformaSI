@@ -29,24 +29,29 @@ export function ProveedorApp({ children }: { children: ReactNode }) {
   const [ajustes, setAjustes] = useState<AjustesInstitucionales>(ajustesPorDefecto)
   const [instrumentos, setInstrumentos] = useState<InstrumentoDisponible[]>([])
 
-  // El administrador nunca carga instrumentos para responder: el backend se los deniega.
+  // El administrador nunca carga instrumentos para responder ni la población completa: sus
+  // pantallas consultan agregados y páginas del panel, de modo que el tamaño del personal no
+  // afecta al arranque de la sesión.
   const cargarDatos = useCallback(async (usuario: Usuario) => {
-    const [listaUsuarios, listaRegistros, listaCheckins, configuracion] = await Promise.all([
+    const configuracion = await api.ajustes()
+    setAjustes({ ...ajustesPorDefecto, ...configuracion })
+    if (usuario.rol !== 'evaluado') {
+      setUsuarios([])
+      setRegistros([])
+      setCheckins([])
+      setInstrumentos([])
+      return
+    }
+    const [listaUsuarios, listaRegistros, listaCheckins, listaInstrumentos] = await Promise.all([
       api.usuarios(),
       api.registros(),
       api.checkins(),
-      api.ajustes(),
+      api.instrumentos().catch(() => []),
     ])
     setUsuarios(listaUsuarios)
     setRegistros(listaRegistros)
     setCheckins(listaCheckins)
-    // El evaluado recibe solo los parámetros mínimos de cálculo; el resto usa los valores por defecto.
-    setAjustes({ ...ajustesPorDefecto, ...configuracion })
-    if (usuario.rol === 'evaluado') {
-      setInstrumentos(await api.instrumentos().catch(() => []))
-    } else {
-      setInstrumentos([])
-    }
+    setInstrumentos(listaInstrumentos)
   }, [])
 
   useEffect(() => {
@@ -156,9 +161,9 @@ export function ProveedorApp({ children }: { children: ReactNode }) {
   const guardarRespuestaInstrumento = useCallback(
     async (instrumentoId: string, respuestas: Record<string, ValorRespuesta>, finalizar: boolean) => {
       const guardada = await api.guardarRespuestaInstrumento(instrumentoId, respuestas, finalizar)
-      setInstrumentos((previos) =>
-        previos.map((item) => (item.id === instrumentoId ? { ...item, miRespuesta: guardada } : item)),
-      )
+      // Tras finalizar cambian la disponibilidad, el conteo de aplicaciones y la próxima fecha.
+      setInstrumentos(await api.instrumentos().catch(() => []))
+      return guardada
     },
     [],
   )

@@ -1,6 +1,61 @@
 import { randomUUID } from 'node:crypto'
 import crypto from 'node:crypto'
 import pg from 'pg'
+import { INSTRUMENTOS_ESTANDARIZADOS } from './instrumentosBase.js'
+import { definicionModeloV1, reglasAlertaPorDefecto } from './modeloRiesgo.js'
+
+// Catálogo inicial de mitigación. Son recomendaciones generales de gestión de fatiga ya
+// presentes en la plataforma; quedan marcadas como pendientes de validación institucional y
+// son editables desde administración. No sustituyen protocolos médicos ni operacionales.
+const estrategiasIniciales = [
+  {
+    titulo: 'Descanso protegido y reporte de fatiga',
+    descripcion:
+      'Ante nivel crítico, el evaluado no debería asumir tareas de seguridad crítica sin una decisión formal del mando o del servicio médico.',
+    nivelObjetivo: 'critico',
+    dominio: '',
+    acciones: 'Reportar fatiga; solicitar relevo; asegurar dos periodos completos de sueño antes de reincorporarse.',
+    reevaluarDias: 1,
+    escalamiento: 'Jefe de operaciones y medicina aeroespacial',
+  },
+  {
+    titulo: 'Refuerzo de tripulación y redistribución de tareas',
+    descripcion: 'Reducir la exposición individual cuando el índice integrado se mantiene alto.',
+    nivelObjetivo: 'alto',
+    dominio: '',
+    acciones: 'Tripulación aumentada; asignar maniobras críticas al personal menos fatigado; lectura cruzada de listas.',
+    reevaluarDias: 2,
+    escalamiento: 'Jefe de operaciones',
+  },
+  {
+    titulo: 'Recuperación del déficit de sueño',
+    descripcion: 'Indicada cuando el dominio de sueño y recuperación es el principal contribuyente.',
+    nivelObjetivo: 'alto',
+    dominio: 'sueno_recuperacion',
+    acciones: 'Siesta de 20-30 min o 90-120 min según disponibilidad; dos noches de sueño sin alarma; evitar inicios tempranos.',
+    reevaluarDias: 3,
+    escalamiento: '',
+  },
+  {
+    titulo: 'Revisión de la carga de trabajo asignada',
+    descripcion: 'Indicada cuando la carga percibida (NASA-TLX) se mantiene alta.',
+    nivelObjetivo: 'moderado',
+    dominio: 'carga_trabajo',
+    acciones: 'Revisar cargos acumulados y relevos disponibles; redistribuir tareas secundarias; revisar planificación del turno.',
+    reevaluarDias: 7,
+    escalamiento: 'Jefe de unidad',
+  },
+  {
+    titulo: 'Derivación por somnolencia diurna excesiva',
+    descripcion:
+      'Un Epworth ≥ 11 sugiere somnolencia diurna excesiva que puede responder a un trastorno del sueño subyacente.',
+    nivelObjetivo: 'moderado',
+    dominio: 'somnolencia_habitual',
+    acciones: 'Valoración en medicina aeroespacial; tamizaje de apnea del sueño cuando corresponda.',
+    reevaluarDias: 30,
+    escalamiento: 'Medicina aeroespacial',
+  },
+]
 
 const cadena = process.env.DATABASE_URL
 if (!cadena) {
@@ -159,14 +214,120 @@ CREATE TABLE IF NOT EXISTS respuestas_instrumento (
   UNIQUE (instrumento_id, usuario_id)
 );
 
+CREATE TABLE IF NOT EXISTS modelos_riesgo (
+  id TEXT PRIMARY KEY,
+  version INTEGER NOT NULL UNIQUE,
+  nombre TEXT NOT NULL,
+  definicion TEXT NOT NULL,
+  activo BOOLEAN NOT NULL DEFAULT FALSE,
+  nota TEXT NOT NULL DEFAULT '',
+  creado_en TEXT NOT NULL,
+  creado_por TEXT
+);
+
+CREATE TABLE IF NOT EXISTS evaluaciones_riesgo (
+  id TEXT PRIMARY KEY,
+  usuario_id TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  calculado_en TEXT NOT NULL,
+  version_modelo INTEGER NOT NULL,
+  puntaje DOUBLE PRECISION NOT NULL,
+  puntaje_base DOUBLE PRECISION NOT NULL,
+  nivel TEXT NOT NULL,
+  confianza TEXT NOT NULL,
+  cobertura DOUBLE PRECISION NOT NULL,
+  detalle TEXT NOT NULL,
+  disparado_por TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS lineas_base (
+  usuario_id TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  dominio TEXT NOT NULL,
+  media DOUBLE PRECISION NOT NULL,
+  desviacion DOUBLE PRECISION NOT NULL,
+  n INTEGER NOT NULL,
+  provisional BOOLEAN NOT NULL DEFAULT TRUE,
+  actualizado_en TEXT NOT NULL,
+  PRIMARY KEY (usuario_id, dominio)
+);
+
+CREATE TABLE IF NOT EXISTS reglas_alerta (
+  id TEXT PRIMARY KEY,
+  clave TEXT NOT NULL UNIQUE,
+  nombre TEXT NOT NULL,
+  descripcion TEXT NOT NULL DEFAULT '',
+  tipo TEXT NOT NULL,
+  parametros TEXT NOT NULL DEFAULT '{}',
+  severidad TEXT NOT NULL DEFAULT 'media',
+  activa BOOLEAN NOT NULL DEFAULT TRUE,
+  creado_en TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS alertas (
+  id TEXT PRIMARY KEY,
+  usuario_id TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  regla_clave TEXT NOT NULL,
+  severidad TEXT NOT NULL,
+  motivo TEXT NOT NULL,
+  estado TEXT NOT NULL DEFAULT 'abierta',
+  evaluacion_riesgo_id TEXT,
+  nota TEXT NOT NULL DEFAULT '',
+  creado_en TEXT NOT NULL,
+  actualizado_en TEXT NOT NULL,
+  cerrado_por TEXT
+);
+
+CREATE TABLE IF NOT EXISTS estrategias_mitigacion (
+  id TEXT PRIMARY KEY,
+  titulo TEXT NOT NULL,
+  descripcion TEXT NOT NULL DEFAULT '',
+  nivel_objetivo TEXT NOT NULL DEFAULT 'alto',
+  dominio TEXT NOT NULL DEFAULT '',
+  acciones TEXT NOT NULL DEFAULT '',
+  reevaluar_dias INTEGER,
+  escalamiento TEXT NOT NULL DEFAULT '',
+  requiere_validacion BOOLEAN NOT NULL DEFAULT TRUE,
+  activa BOOLEAN NOT NULL DEFAULT TRUE,
+  orden INTEGER NOT NULL DEFAULT 0,
+  creado_en TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_preguntas_instrumento ON preguntas(instrumento_id, orden);
 CREATE INDEX IF NOT EXISTS idx_respuestas_usuario ON respuestas_instrumento(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_checkins_usuario ON checkins(usuario_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_registros_usuario ON registros(usuario_id, creado_en);
 CREATE INDEX IF NOT EXISTS idx_codigos_correo ON codigos_acceso(correo, creado_en);
+CREATE INDEX IF NOT EXISTS idx_riesgo_usuario ON evaluaciones_riesgo(usuario_id, calculado_en DESC);
+CREATE INDEX IF NOT EXISTS idx_riesgo_nivel ON evaluaciones_riesgo(nivel);
+CREATE INDEX IF NOT EXISTS idx_alertas_estado ON alertas(estado, creado_en DESC);
+CREATE INDEX IF NOT EXISTS idx_alertas_usuario ON alertas(usuario_id, estado);
 `)
 
   await migrarAccesoPorCorreo()
+  await migrarInstrumentosLongitudinales()
+}
+
+// Las respuestas dejan de ser una por instrumento y usuario: cada aplicación es un evento
+// con su fecha, su versión de instrumento y su puntaje, para poder analizar la serie temporal.
+async function migrarInstrumentosLongitudinales() {
+  await pool.query(`
+ALTER TABLE instrumentos ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE instrumentos ADD COLUMN IF NOT EXISTS frecuencia_dias INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE instrumentos ADD COLUMN IF NOT EXISTS dominio TEXT NOT NULL DEFAULT '';
+ALTER TABLE respuestas_instrumento ADD COLUMN IF NOT EXISTS instrumento_version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE respuestas_instrumento ADD COLUMN IF NOT EXISTS puntaje_normalizado DOUBLE PRECISION;
+ALTER TABLE respuestas_instrumento ADD COLUMN IF NOT EXISTS interpretacion TEXT NOT NULL DEFAULT '';
+ALTER TABLE respuestas_instrumento ADD COLUMN IF NOT EXISTS detalle TEXT NOT NULL DEFAULT '{}';
+ALTER TABLE respuestas_instrumento
+  DROP CONSTRAINT IF EXISTS respuestas_instrumento_instrumento_id_usuario_id_key;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_respuesta_borrador_unica
+  ON respuestas_instrumento (instrumento_id, usuario_id) WHERE estado = 'borrador';
+CREATE INDEX IF NOT EXISTS idx_respuestas_serie
+  ON respuestas_instrumento (usuario_id, instrumento_id, finalizado_en DESC);
+ALTER TABLE preguntas ADD COLUMN IF NOT EXISTS clave TEXT;
+ALTER TABLE preguntas ADD COLUMN IF NOT EXISTS minimo DOUBLE PRECISION;
+ALTER TABLE preguntas ADD COLUMN IF NOT EXISTS maximo DOUBLE PRECISION;
+ALTER TABLE preguntas ADD COLUMN IF NOT EXISTS paso DOUBLE PRECISION;
+`)
 }
 
 async function migrarAccesoPorCorreo() {
@@ -319,38 +480,150 @@ async function sembrarCheckins(usuarioId, semilla) {
   }
 }
 
+// El registro diario deja de contener KSS y Samn-Perelli: esas escalas son ahora instrumentos
+// independientes. El registro conserva sueño, vigilia y condiciones del servicio, que alimentan
+// el dominio de sueño y recuperación del modelo integrado.
 const instrumentosDelSistema = [
   {
     clave: 'checkin',
-    nombre: 'Check-in diario de fatiga',
+    nombre: 'Registro diario de sueño y jornada',
     descripcion:
-      'Registro breve previo al servicio: horas de sueño y vigilia, KSS, Samn-Perelli y condiciones del vuelo.',
-    orden: 1,
-  },
-  {
-    clave: 'evaluacion',
-    nombre: 'Evaluación completa de fatiga',
-    descripcion:
-      'Instrumento extendido: perfil biomédico, cargos y jornada, escalas KSS, Samn-Perelli y Epworth.',
-    orden: 2,
+      'Registro breve previo al servicio: horas de sueño, vigilia acumulada y condiciones del vuelo.',
+    dominio: 'sueno_recuperacion',
+    frecuenciaDias: 1,
+    orden: 10,
   },
 ]
 
 export async function asegurarInstrumentosBase() {
+  const ahora = new Date().toISOString()
+
   for (const instrumento of instrumentosDelSistema) {
     await pool.query(
-      `INSERT INTO instrumentos (id, clave, nombre, descripcion, tipo, activo, orden, creado_en)
-       VALUES ($1,$2,$3,$4,'sistema',TRUE,$5,$6)
-       ON CONFLICT (clave) DO NOTHING`,
+      `INSERT INTO instrumentos (id, clave, nombre, descripcion, tipo, activo, orden, creado_en, dominio, frecuencia_dias)
+       VALUES ($1,$2,$3,$4,'sistema',TRUE,$5,$6,$7,$8)
+       ON CONFLICT (clave) DO UPDATE SET
+         nombre = excluded.nombre,
+         descripcion = excluded.descripcion,
+         dominio = excluded.dominio,
+         frecuencia_dias = excluded.frecuencia_dias`,
       [
         randomUUID(),
         instrumento.clave,
         instrumento.nombre,
         instrumento.descripcion,
         instrumento.orden,
+        ahora,
+        instrumento.dominio,
+        instrumento.frecuenciaDias,
+      ],
+    )
+  }
+
+  // La evaluación agrupada queda archivada: sus escalas viven ahora por separado.
+  await pool.query("UPDATE instrumentos SET activo = FALSE WHERE clave = 'evaluacion'")
+
+  for (const definicion of INSTRUMENTOS_ESTANDARIZADOS) {
+    const id = randomUUID()
+    await pool.query(
+      `INSERT INTO instrumentos
+         (id, clave, nombre, descripcion, tipo, activo, orden, creado_en, version, frecuencia_dias, dominio)
+       VALUES ($1,$2,$3,$4,'estandarizado',TRUE,$5,$6,1,$7,$8)
+       ON CONFLICT (clave) DO UPDATE SET
+         nombre = excluded.nombre,
+         descripcion = excluded.descripcion,
+         tipo = 'estandarizado',
+         dominio = excluded.dominio`,
+      [
+        id,
+        definicion.clave,
+        definicion.nombre,
+        definicion.descripcion,
+        definicion.orden,
+        ahora,
+        definicion.frecuenciaDias,
+        definicion.dominio,
+      ],
+    )
+    const fila = await unaFila('SELECT id FROM instrumentos WHERE clave = $1', [definicion.clave])
+    for (const pregunta of definicion.preguntas) {
+      await pool.query(
+        `INSERT INTO preguntas
+           (id, instrumento_id, texto, ayuda, tipo, opciones, obligatoria, activa, orden, creado_en, clave, minimo, maximo, paso)
+         SELECT $1,$2,$3,$4,$5,$6,TRUE,TRUE,$7,$8,$9,$10,$11,$12
+         WHERE NOT EXISTS (SELECT 1 FROM preguntas WHERE instrumento_id = $2 AND clave = $9)`,
+        [
+          randomUUID(),
+          fila.id,
+          pregunta.texto,
+          pregunta.ayuda,
+          pregunta.tipo,
+          JSON.stringify(pregunta.opciones ?? []),
+          pregunta.orden,
+          ahora,
+          pregunta.clave,
+          pregunta.minimo ?? null,
+          pregunta.maximo ?? null,
+          pregunta.paso ?? null,
+        ],
+      )
+    }
+  }
+}
+
+export async function asegurarModeloRiesgo() {
+  await pool.query(
+    `INSERT INTO modelos_riesgo (id, version, nombre, definicion, activo, nota, creado_en)
+     VALUES ($1,1,$2,$3,TRUE,$4,$5)
+     ON CONFLICT (version) DO NOTHING`,
+    [
+      randomUUID(),
+      definicionModeloV1.nombre,
+      JSON.stringify(definicionModeloV1),
+      'Versión inicial. Pesos, umbrales y reglas requieren validación clínica e institucional.',
+      new Date().toISOString(),
+    ],
+  )
+  for (const regla of reglasAlertaPorDefecto) {
+    await pool.query(
+      `INSERT INTO reglas_alerta (id, clave, nombre, descripcion, tipo, parametros, severidad, activa, creado_en)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       ON CONFLICT (clave) DO NOTHING`,
+      [
+        randomUUID(),
+        regla.clave,
+        regla.nombre,
+        regla.descripcion,
+        regla.tipo,
+        JSON.stringify(regla.parametros),
+        regla.severidad,
+        regla.activa,
         new Date().toISOString(),
       ],
     )
+  }
+  const { total } = await unaFila('SELECT COUNT(*)::int AS total FROM estrategias_mitigacion')
+  if (total === 0) {
+    for (const [indice, estrategia] of estrategiasIniciales.entries()) {
+      await pool.query(
+        `INSERT INTO estrategias_mitigacion
+           (id, titulo, descripcion, nivel_objetivo, dominio, acciones, reevaluar_dias, escalamiento,
+            requiere_validacion, activa, orden, creado_en)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,TRUE,TRUE,$9,$10)`,
+        [
+          randomUUID(),
+          estrategia.titulo,
+          estrategia.descripcion,
+          estrategia.nivelObjetivo,
+          estrategia.dominio,
+          estrategia.acciones,
+          estrategia.reevaluarDias,
+          estrategia.escalamiento,
+          indice + 1,
+          new Date().toISOString(),
+        ],
+      )
+    }
   }
 }
 
@@ -388,6 +661,7 @@ export async function inicializarDatos() {
   ])
 
   await asegurarInstrumentosBase()
+  await asegurarModeloRiesgo()
 
   const { total } = await unaFila('SELECT COUNT(*)::int AS total FROM usuarios')
   if (total > 0) {
