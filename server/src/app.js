@@ -40,6 +40,33 @@ function asincrono(manejador) {
     Promise.resolve(manejador(peticion, respuesta, siguiente)).catch(siguiente)
 }
 
+const perfilPorDefecto = {
+  nombres: '',
+  apellidos: '',
+  cedula: '',
+  fechaNacimiento: '',
+  pesoKg: 75,
+  tallaCm: 172,
+  antecedentes: [],
+  antecedentesOtros: '',
+  funcionPrincipal: '',
+  funcionSecundaria: '',
+  cargoPrincipal: '',
+  cargoAdicional: '',
+}
+
+function perfilCompleto(crudo) {
+  let guardado = {}
+  try {
+    guardado = JSON.parse(crudo ?? '{}') ?? {}
+  } catch {
+    guardado = {}
+  }
+  const perfil = { ...perfilPorDefecto, ...guardado }
+  if (!Array.isArray(perfil.antecedentes)) perfil.antecedentes = []
+  return perfil
+}
+
 function usuarioPublico(fila) {
   return {
     id: fila.id,
@@ -50,7 +77,7 @@ function usuarioPublico(fila) {
     unidad: fila.unidad,
     rol: fila.rol,
     activo: Boolean(fila.activo),
-    perfil: JSON.parse(fila.perfil),
+    perfil: perfilCompleto(fila.perfil),
     creadoEn: fila.creado_en,
   }
 }
