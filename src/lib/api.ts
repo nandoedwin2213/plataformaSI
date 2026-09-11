@@ -1,5 +1,14 @@
 import type { RegistroHistorial } from '../domain/types'
 import type { AjustesInstitucionales, CheckIn, Usuario } from '../domain/usuarios'
+import type {
+  DatosPregunta,
+  Instrumento,
+  InstrumentoDisponible,
+  Pregunta,
+  RespuestaInstrumento,
+  ResumenAdmin,
+  ValorRespuesta,
+} from '../domain/instrumentos'
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 const CLAVE_TOKEN = 'fae-fatiga-token'
@@ -100,4 +109,36 @@ export const api = {
     pedir<AjustesInstitucionales>('/api/ajustes', { method: 'PUT', body: JSON.stringify(datos) }),
   auditoria: () => pedir<RegistroAuditoria[]>('/api/auditoria'),
   reiniciar: () => pedir<{ estado: string }>('/api/reiniciar', { method: 'POST' }),
+
+  // Instrumentos configurables: lectura y respuesta del evaluado
+  instrumentos: () => pedir<InstrumentoDisponible[]>('/api/instrumentos'),
+  guardarRespuestaInstrumento: (
+    instrumentoId: string,
+    respuestas: Record<string, ValorRespuesta>,
+    finalizar: boolean,
+  ) =>
+    pedir<RespuestaInstrumento>(`/api/instrumentos/${instrumentoId}/respuesta`, {
+      method: 'PUT',
+      body: JSON.stringify({ respuestas, finalizar }),
+    }),
+
+  // Administración
+  resumenAdmin: () => pedir<ResumenAdmin>('/api/admin/resumen'),
+  instrumentosAdmin: () => pedir<Instrumento[]>('/api/admin/instrumentos'),
+  crearInstrumento: (datos: { nombre: string; descripcion: string }) =>
+    pedir<Instrumento>('/api/admin/instrumentos', { method: 'POST', body: JSON.stringify(datos) }),
+  actualizarInstrumento: (
+    id: string,
+    datos: Partial<Pick<Instrumento, 'nombre' | 'descripcion' | 'activo' | 'orden'>>,
+  ) => pedir<Instrumento>(`/api/admin/instrumentos/${id}`, { method: 'PUT', body: JSON.stringify(datos) }),
+  eliminarInstrumento: (id: string) => pedir<void>(`/api/admin/instrumentos/${id}`, { method: 'DELETE' }),
+  crearPregunta: (instrumentoId: string, datos: DatosPregunta) =>
+    pedir<Pregunta>(`/api/admin/instrumentos/${instrumentoId}/preguntas`, {
+      method: 'POST',
+      body: JSON.stringify(datos),
+    }),
+  actualizarPregunta: (id: string, datos: Partial<DatosPregunta> & { orden?: number }) =>
+    pedir<Pregunta>(`/api/admin/preguntas/${id}`, { method: 'PUT', body: JSON.stringify(datos) }),
+  eliminarPregunta: (id: string) => pedir<void>(`/api/admin/preguntas/${id}`, { method: 'DELETE' }),
+  respuestasAdmin: () => pedir<RespuestaInstrumento[]>('/api/admin/respuestas'),
 }

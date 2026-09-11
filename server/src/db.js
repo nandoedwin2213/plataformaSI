@@ -122,6 +122,45 @@ CREATE TABLE IF NOT EXISTS codigos_acceso (
   intentos INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS instrumentos (
+  id TEXT PRIMARY KEY,
+  clave TEXT NOT NULL UNIQUE,
+  nombre TEXT NOT NULL,
+  descripcion TEXT NOT NULL DEFAULT '',
+  tipo TEXT NOT NULL DEFAULT 'personalizado',
+  activo BOOLEAN NOT NULL DEFAULT TRUE,
+  orden INTEGER NOT NULL DEFAULT 0,
+  creado_en TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS preguntas (
+  id TEXT PRIMARY KEY,
+  instrumento_id TEXT NOT NULL REFERENCES instrumentos(id) ON DELETE CASCADE,
+  texto TEXT NOT NULL,
+  ayuda TEXT NOT NULL DEFAULT '',
+  tipo TEXT NOT NULL,
+  opciones TEXT NOT NULL DEFAULT '[]',
+  obligatoria BOOLEAN NOT NULL DEFAULT TRUE,
+  activa BOOLEAN NOT NULL DEFAULT TRUE,
+  orden INTEGER NOT NULL DEFAULT 0,
+  creado_en TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS respuestas_instrumento (
+  id TEXT PRIMARY KEY,
+  instrumento_id TEXT NOT NULL REFERENCES instrumentos(id) ON DELETE CASCADE,
+  usuario_id TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  estado TEXT NOT NULL DEFAULT 'borrador',
+  respuestas TEXT NOT NULL DEFAULT '{}',
+  puntaje DOUBLE PRECISION,
+  creado_en TEXT NOT NULL,
+  actualizado_en TEXT NOT NULL,
+  finalizado_en TEXT,
+  UNIQUE (instrumento_id, usuario_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_preguntas_instrumento ON preguntas(instrumento_id, orden);
+CREATE INDEX IF NOT EXISTS idx_respuestas_usuario ON respuestas_instrumento(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_checkins_usuario ON checkins(usuario_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_registros_usuario ON registros(usuario_id, creado_en);
 CREATE INDEX IF NOT EXISTS idx_codigos_correo ON codigos_acceso(correo, creado_en);
@@ -280,6 +319,41 @@ async function sembrarCheckins(usuarioId, semilla) {
   }
 }
 
+const instrumentosDelSistema = [
+  {
+    clave: 'checkin',
+    nombre: 'Check-in diario de fatiga',
+    descripcion:
+      'Registro breve previo al servicio: horas de sueño y vigilia, KSS, Samn-Perelli y condiciones del vuelo.',
+    orden: 1,
+  },
+  {
+    clave: 'evaluacion',
+    nombre: 'Evaluación completa de fatiga',
+    descripcion:
+      'Instrumento extendido: perfil biomédico, cargos y jornada, escalas KSS, Samn-Perelli y Epworth.',
+    orden: 2,
+  },
+]
+
+export async function asegurarInstrumentosBase() {
+  for (const instrumento of instrumentosDelSistema) {
+    await pool.query(
+      `INSERT INTO instrumentos (id, clave, nombre, descripcion, tipo, activo, orden, creado_en)
+       VALUES ($1,$2,$3,$4,'sistema',TRUE,$5,$6)
+       ON CONFLICT (clave) DO NOTHING`,
+      [
+        randomUUID(),
+        instrumento.clave,
+        instrumento.nombre,
+        instrumento.descripcion,
+        instrumento.orden,
+        new Date().toISOString(),
+      ],
+    )
+  }
+}
+
 export async function asegurarAdministrador() {
   const existente = await unaFila("SELECT id FROM usuarios WHERE rol = 'admin'")
   if (existente) return existente.id
@@ -312,6 +386,8 @@ export async function inicializarDatos() {
   await pool.query('INSERT INTO ajustes (id, datos) VALUES (1, $1) ON CONFLICT (id) DO NOTHING', [
     JSON.stringify(ajustesPorDefecto),
   ])
+
+  await asegurarInstrumentosBase()
 
   const { total } = await unaFila('SELECT COUNT(*)::int AS total FROM usuarios')
   if (total > 0) {

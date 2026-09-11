@@ -15,7 +15,7 @@ function ultimosDias(cantidad: number): string[] {
 }
 
 export function Inicio() {
-  const { usuarioActual, checkins, registros, usuarios, ajustes } = useApp()
+  const { usuarioActual, checkins, registros, instrumentos, ajustes } = useApp()
   if (!usuarioActual) return null
 
   const hoy = new Date().toISOString().slice(0, 10)
@@ -41,10 +41,8 @@ export function Inicio() {
   const serieProyectada =
     proyeccion?.dias.map((dia) => ({ etiqueta: dia.fecha.slice(5), valor: dia.puntaje })) ?? []
 
-  const esMando = usuarioActual.rol === 'admin'
-  const pilotos = usuarios.filter((usuario) => usuario.rol === 'evaluado' && usuario.activo)
-  const sinCheckinHoy = pilotos.filter(
-    (piloto) => !checkins.some((item) => item.usuarioId === piloto.id && item.fecha === hoy),
+  const pendientes = instrumentos.filter(
+    (instrumento) => instrumento.tipo === 'personalizado' && instrumento.miRespuesta?.estado !== 'finalizada',
   )
 
   return (
@@ -103,26 +101,28 @@ export function Inicio() {
         </section>
       </div>
 
-      {esMando && (
-        <section className="card">
-          <h2 className="section-title">Pendientes de la unidad</h2>
-          <p className="text-sm text-slate-300">
-            {sinCheckinHoy.length} de {pilotos.length} tripulantes no han registrado su check-in hoy.
+      <section className="card">
+        <h2 className="section-title">Evaluaciones asignadas</h2>
+        {pendientes.length === 0 ? (
+          <p className="text-sm text-slate-400">
+            No tienes evaluaciones pendientes de la unidad.{' '}
+            <Link to="/pruebas" className="text-cyan-400 hover:underline">
+              Ver mis evaluaciones
+            </Link>
           </p>
-          {sinCheckinHoy.length > 0 && (
-            <ul className="mt-3 space-y-1 text-sm text-slate-400">
-              {sinCheckinHoy.map((piloto) => (
-                <li key={piloto.id}>
-                  {piloto.grado} {piloto.nombre} · {piloto.unidad}
-                </li>
-              ))}
-            </ul>
-          )}
-          <Link to="/tablero" className="btn-ghost mt-4 inline-block">
-            Ver tablero de escuadrón
-          </Link>
-        </section>
-      )}
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {pendientes.map((instrumento) => (
+              <li key={instrumento.id} className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-slate-300">{instrumento.nombre}</span>
+                <Link to={`/pruebas/${instrumento.id}`} className="btn-ghost">
+                  {instrumento.miRespuesta ? 'Continuar' : 'Iniciar'}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   )
 }
