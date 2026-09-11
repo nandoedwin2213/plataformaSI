@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useApp } from '../store/contexto'
 import { gradosMilitares } from '../domain/catalogos'
 import { perfilVacio } from '../domain/usuarios'
@@ -163,7 +164,9 @@ export function Personal() {
             {usuarios.map((persona) => (
               <tr key={persona.id} className="border-b border-white/5 last:border-0">
                 <td className="py-2 pr-4 text-slate-200">
-                  {persona.grado} {persona.nombre}
+                  <Link to={`/admin/personal/${persona.id}`} className="hover:text-cyan-300">
+                    {persona.grado} {persona.nombre}
+                  </Link>
                   <span className="block text-xs text-slate-500">{persona.correo}</span>
                 </td>
                 <td className="py-2 pr-4 text-slate-400">{persona.unidad}</td>

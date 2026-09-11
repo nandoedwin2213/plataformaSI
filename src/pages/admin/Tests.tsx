@@ -20,17 +20,29 @@ function requiereOpciones(tipo: TipoPregunta): boolean {
   return tipo === 'unica' || tipo === 'multiple'
 }
 
+function textoDeOpciones(opciones: DatosPregunta['opciones']): string {
+  return opciones.map((opcion) => `${opcion.texto}|${opcion.valor}`).join('\n')
+}
+
 function FormularioPregunta({
+  titulo,
+  etiquetaGuardar,
+  inicial,
   onGuardar,
+  onCancelar,
 }: {
+  titulo: string
+  etiquetaGuardar: string
+  inicial?: DatosPregunta
   onGuardar: (datos: DatosPregunta) => Promise<void>
+  onCancelar?: () => void
 }) {
-  const [datos, setDatos] = useState<DatosPregunta>(preguntaVacia)
-  const [opcionesTexto, setOpcionesTexto] = useState('')
+  const [datos, setDatos] = useState<DatosPregunta>(inicial ?? preguntaVacia)
+  const [opcionesTexto, setOpcionesTexto] = useState(textoDeOpciones(inicial?.opciones ?? []))
 
   return (
     <div className="space-y-3 rounded-lg border border-white/10 p-4">
-      <p className="text-sm font-semibold text-slate-200">Nueva pregunta</p>
+      <p className="text-sm font-semibold text-slate-200">{titulo}</p>
       <div className="grid gap-3 md:grid-cols-2">
         <div>
           <label className="label">Enunciado</label>
@@ -82,25 +94,34 @@ function FormularioPregunta({
         />
         Obligatoria
       </label>
-      <button
-        className="btn-primary"
-        onClick={() => {
-          const opciones = opcionesTexto
-            .split('\n')
-            .map((linea) => linea.trim())
-            .filter(Boolean)
-            .map((linea, indice) => {
-              const [texto, valor] = linea.split('|')
-              return { texto: texto.trim(), valor: Number(valor ?? indice) || indice }
+      <div className="flex flex-wrap gap-2">
+        <button
+          className="btn-primary"
+          disabled={!datos.texto.trim()}
+          onClick={() => {
+            const opciones = opcionesTexto
+              .split('\n')
+              .map((linea) => linea.trim())
+              .filter(Boolean)
+              .map((linea, indice) => {
+                const [texto, valor] = linea.split('|')
+                return { texto: texto.trim(), valor: Number(valor ?? indice) || indice }
+              })
+            void onGuardar({ ...datos, opciones }).then(() => {
+              if (inicial) return
+              setDatos(preguntaVacia)
+              setOpcionesTexto('')
             })
-          void onGuardar({ ...datos, opciones }).then(() => {
-            setDatos(preguntaVacia)
-            setOpcionesTexto('')
-          })
-        }}
-      >
-        Agregar pregunta
-      </button>
+          }}
+        >
+          {etiquetaGuardar}
+        </button>
+        {onCancelar && (
+          <button className="btn-ghost" onClick={onCancelar}>
+            Cancelar
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -110,6 +131,9 @@ export function TestsAdmin() {
   const [nombre, setNombre] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [error, setError] = useState('')
+  const [preguntaEnEdicion, setPreguntaEnEdicion] = useState('')
+  const [instrumentoEnEdicion, setInstrumentoEnEdicion] = useState('')
+  const [datosInstrumento, setDatosInstrumento] = useState({ nombre: '', descripcion: '' })
 
   const recargar = async () => {
     try {
@@ -200,6 +224,20 @@ export function TestsAdmin() {
               </button>
               {instrumento.tipo === 'personalizado' && (
                 <button
+                  className="btn-ghost"
+                  onClick={() => {
+                    setInstrumentoEnEdicion(instrumento.id)
+                    setDatosInstrumento({
+                      nombre: instrumento.nombre,
+                      descripcion: instrumento.descripcion,
+                    })
+                  }}
+                >
+                  Editar test
+                </button>
+              )}
+              {instrumento.tipo === 'personalizado' && (
+                <button
                   className="btn-ghost text-red-300"
                   onClick={() => {
                     if (window.confirm(`¿Eliminar el test "${instrumento.nombre}" y sus respuestas?`)) {
@@ -212,6 +250,48 @@ export function TestsAdmin() {
               )}
             </div>
           </div>
+
+          {instrumentoEnEdicion === instrumento.id && (
+            <div className="grid gap-3 rounded-lg border border-white/10 p-4 md:grid-cols-2">
+              <div>
+                <label className="label">Nombre</label>
+                <input
+                  className="input"
+                  value={datosInstrumento.nombre}
+                  onChange={(evento) =>
+                    setDatosInstrumento({ ...datosInstrumento, nombre: evento.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="label">Descripción</label>
+                <input
+                  className="input"
+                  value={datosInstrumento.descripcion}
+                  onChange={(evento) =>
+                    setDatosInstrumento({ ...datosInstrumento, descripcion: evento.target.value })
+                  }
+                />
+              </div>
+              <div className="flex gap-2 md:col-span-2">
+                <button
+                  className="btn-primary"
+                  disabled={!datosInstrumento.nombre.trim()}
+                  onClick={() =>
+                    void ejecutar(async () => {
+                      await api.actualizarInstrumento(instrumento.id, datosInstrumento)
+                      setInstrumentoEnEdicion('')
+                    })
+                  }
+                >
+                  Guardar cambios
+                </button>
+                <button className="btn-ghost" onClick={() => setInstrumentoEnEdicion('')}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
 
           {instrumento.tipo === 'sistema' ? (
             <p className="text-sm text-slate-400">
@@ -244,6 +324,14 @@ export function TestsAdmin() {
                         <button
                           className="btn-ghost"
                           onClick={() =>
+                            setPreguntaEnEdicion(preguntaEnEdicion === pregunta.id ? '' : pregunta.id)
+                          }
+                        >
+                          {preguntaEnEdicion === pregunta.id ? 'Cerrar' : 'Editar'}
+                        </button>
+                        <button
+                          className="btn-ghost"
+                          onClick={() =>
                             void ejecutar(() =>
                               api.actualizarPregunta(pregunta.id, { activa: !pregunta.activa }),
                             )
@@ -258,11 +346,37 @@ export function TestsAdmin() {
                           Eliminar
                         </button>
                       </div>
+                      {preguntaEnEdicion === pregunta.id && (
+                        <div className="w-full">
+                          <FormularioPregunta
+                            key={pregunta.id}
+                            titulo="Editar pregunta"
+                            etiquetaGuardar="Guardar pregunta"
+                            inicial={{
+                              texto: pregunta.texto,
+                              ayuda: pregunta.ayuda,
+                              tipo: pregunta.tipo,
+                              opciones: pregunta.opciones,
+                              obligatoria: pregunta.obligatoria,
+                              activa: pregunta.activa,
+                            }}
+                            onCancelar={() => setPreguntaEnEdicion('')}
+                            onGuardar={async (datos) => {
+                              await ejecutar(async () => {
+                                await api.actualizarPregunta(pregunta.id, datos)
+                                setPreguntaEnEdicion('')
+                              })
+                            }}
+                          />
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>
               )}
               <FormularioPregunta
+                titulo="Nueva pregunta"
+                etiquetaGuardar="Agregar pregunta"
                 onGuardar={async (datos) => {
                   await ejecutar(() => api.crearPregunta(instrumento.id, datos))
                 }}
