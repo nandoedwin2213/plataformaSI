@@ -178,7 +178,10 @@ async function main() {
   console.log('\n5. Aislamiento entre evaluados y bloqueo de rutas administrativas')
   const otro = await entrar(correoOtro, 'evaluado')
   const historialAjeno = await pedir(`/api/instrumentos/${kss.id}/historial`, {}, otro.token)
-  comprobar('otro evaluado no ve el historial ajeno', historialAjeno.cuerpo.length === 0)
+  comprobar(
+    'otro evaluado no ve el historial ajeno',
+    historialAjeno.cuerpo.every((item) => item.usuarioId === otro.usuario.id),
+  )
   const panelDenegado = await pedir('/api/admin/panel/resumen', {}, evaluado.token)
   comprobar('evaluado no accede al panel poblacional (403)', panelDenegado.estado === 403)
   const personasDenegado = await pedir(`/api/admin/panel/personas/${otro.usuario.id}`, {}, evaluado.token)

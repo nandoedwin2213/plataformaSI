@@ -297,6 +297,7 @@ export function calcularRiesgo({
       peso,
       pesoEfectivo: 0,
       aporte: 0,
+      z: null,
     })
   }
 

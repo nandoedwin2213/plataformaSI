@@ -31,6 +31,26 @@ async function medir(nombre, ruta, token) {
   console.log(`${nombre.padEnd(42)} ${Math.round(mediana)} ms  (${Math.round(tamano / 1024)} KB)`)
 }
 
+async function paginasSinRepetir(nombre, ruta, extraer, paginas = 4, tam = 25) {
+  const vistos = new Set()
+  const repetidos = []
+  for (let pagina = 1; pagina <= paginas; pagina += 1) {
+    const datos = await fetch(`${base}${ruta}&pagina=${pagina}&tam=${tam}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then((respuesta) => respuesta.json())
+    for (const id of extraer(datos)) {
+      if (vistos.has(id)) repetidos.push(id)
+      vistos.add(id)
+    }
+  }
+  if (repetidos.length > 0) {
+    console.error(`${nombre}: ${repetidos.length} IDs repetidos entre páginas`)
+    process.exitCode = 1
+    return
+  }
+  console.log(`${nombre.padEnd(42)} sin repeticiones (${vistos.size} IDs)`)
+}
+
 const token = await entrar()
 await medir('Resumen poblacional', '/api/admin/panel/resumen', token)
 await medir('Listado página 1 (25)', '/api/admin/panel/personas?pagina=1&tam=25', token)
@@ -41,3 +61,13 @@ await medir('Catálogo de filtros', '/api/admin/panel/filtros', token)
 await medir('Alertas abiertas', '/api/admin/alertas', token)
 await medir('Aplicaciones página 1 (25)', '/api/admin/respuestas?pagina=1&tam=25', token)
 await medir('Aplicaciones finalizadas (25)', '/api/admin/respuestas?pagina=1&tam=25&estado=finalizada', token)
+await paginasSinRepetir(
+  'Paginación de población',
+  '/api/admin/panel/personas?orden=puntaje',
+  (datos) => datos.personas.map((persona) => persona.id),
+)
+await paginasSinRepetir(
+  'Paginación de aplicaciones',
+  '/api/admin/respuestas?estado=finalizada',
+  (datos) => datos.aplicaciones.map((aplicacion) => aplicacion.id),
+)

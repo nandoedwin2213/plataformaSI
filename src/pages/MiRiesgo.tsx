@@ -97,7 +97,9 @@ export function MiRiesgo() {
                 <td className="text-slate-400">{Math.round(componente.pesoEfectivo * 100)}%</td>
                 <td className="text-slate-400">{componente.aporte}</td>
                 <td className="text-slate-400">
-                  {componente.z === null ? '—' : `${componente.z > 0 ? '+' : ''}${componente.z} z`}
+                  {typeof componente.z === 'number'
+                    ? `${componente.z > 0 ? '+' : ''}${componente.z} z`
+                    : '—'}
                 </td>
                 <td className="text-slate-500">{componente.fecha?.slice(0, 10) ?? '—'}</td>
               </tr>

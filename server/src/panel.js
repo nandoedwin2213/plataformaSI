@@ -149,7 +149,11 @@ rutasPanel.get(
     const busqueda = texto(peticion.query.busqueda, 120) || null
     const conAlerta = peticion.query.conAlerta === 'true'
     const sinDatos = peticion.query.sinDatos === 'true'
-    const orden = peticion.query.orden === 'nombre' ? 'u.nombre ASC' : 'r.puntaje DESC NULLS LAST'
+    // El id desempata: sin criterio total, dos páginas consecutivas pueden repetir filas.
+    const orden =
+      peticion.query.orden === 'nombre'
+        ? 'u.nombre ASC, u.id ASC'
+        : 'r.puntaje DESC NULLS LAST, u.id ASC'
 
     const filtros = ["u.rol = 'evaluado'"]
     const parametros = []

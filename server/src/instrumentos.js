@@ -655,7 +655,7 @@ rutasInstrumentos.get(
          JOIN usuarios u ON u.id = r.usuario_id
          JOIN instrumentos i ON i.id = r.instrumento_id
          ${donde}
-        ORDER BY r.actualizado_en DESC
+        ORDER BY r.actualizado_en DESC, r.id ASC
         LIMIT ${tam} OFFSET ${(pagina - 1) * tam}`,
       parametros,
     )
