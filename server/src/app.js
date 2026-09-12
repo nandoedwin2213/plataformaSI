@@ -439,6 +439,7 @@ app.get(
     if (esAdministrador(peticion.usuario)) return respuesta.json(ajustes)
     return respuesta.json({
       institucion: ajustes.institucion,
+      subtitulo: ajustes.subtitulo,
       umbrales: ajustes.umbrales,
       jornadaReferencia: ajustes.jornadaReferencia,
     })

@@ -27,8 +27,13 @@ export function Layout() {
       <Ambiente />
       <aside className="border-b border-white/10 bg-slate-950/80 backdrop-blur lg:min-h-screen lg:w-64 lg:border-b-0 lg:border-r no-print">
         <div className="px-5 py-5">
-          <p className="text-[10px] uppercase tracking-[0.3em] text-cyan-400">{ajustes.institucion}</p>
-          <p className="mt-1 text-sm font-bold text-white">FRMS · Gestión de fatiga</p>
+          <p className="text-sm font-bold uppercase leading-tight tracking-[0.18em] text-cyan-400">
+            {ajustes.institucion}
+          </p>
+          <p className="mt-1 text-base font-extrabold uppercase leading-tight tracking-[0.08em] text-white">
+            {ajustes.subtitulo}
+          </p>
+          <p className="mt-1 text-xs font-medium text-slate-400">FRMS · Gestión de fatiga</p>
         </div>
         <nav className="flex flex-wrap gap-1 px-3 pb-4 lg:flex-col">
           {enlaces.map((enlace) => (
