@@ -86,6 +86,7 @@ export function esCorreoAdmin(correo) {
 
 export const ajustesPorDefecto = {
   institucion: 'Fuerza Aérea Ecuatoriana',
+  subtitulo: 'Medicina Aeroespacial',
   unidadPorDefecto: 'Ala de Combate N.º 23',
   umbrales: { moderado: 20, alto: 40, critico: 60 },
   jornadaReferencia: 8,
@@ -705,7 +706,7 @@ export function reiniciarInicializacion() {
 
 export async function leerAjustes() {
   const fila = await unaFila('SELECT datos FROM ajustes WHERE id = 1')
-  return fila ? JSON.parse(fila.datos) : ajustesPorDefecto
+  return fila ? { ...ajustesPorDefecto, ...JSON.parse(fila.datos) } : ajustesPorDefecto
 }
 
 export async function secretoJwt() {

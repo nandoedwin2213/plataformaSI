@@ -54,6 +54,7 @@ export interface Umbrales {
 
 export interface AjustesInstitucionales {
   institucion: string
+  subtitulo: string
   unidadPorDefecto: string
   umbrales: Umbrales
   jornadaReferencia: number
@@ -76,6 +77,7 @@ export const rolesDisponibles: { valor: Rol; texto: string; descripcion: string 
 
 export const ajustesPorDefecto: AjustesInstitucionales = {
   institucion: 'Fuerza Aérea Ecuatoriana',
+  subtitulo: 'Medicina Aeroespacial',
   unidadPorDefecto: 'Ala de Combate N.º 23',
   umbrales: { moderado: 20, alto: 40, critico: 60 },
   jornadaReferencia: 8,

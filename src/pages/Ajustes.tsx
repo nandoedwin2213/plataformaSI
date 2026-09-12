@@ -70,6 +70,17 @@ export function Ajustes() {
             />
           </div>
           <div>
+            <label className="label" htmlFor="subtitulo">
+              Subtítulo (línea que aparece bajo la institución en el menú lateral)
+            </label>
+            <input
+              id="subtitulo"
+              className="input"
+              value={borrador.subtitulo}
+              onChange={(evento) => cambiar({ subtitulo: evento.target.value })}
+            />
+          </div>
+          <div>
             <label className="label" htmlFor="unidadPorDefecto">
               Unidad por defecto
             </label>

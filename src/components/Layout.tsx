@@ -31,7 +31,7 @@ export function Layout() {
             {ajustes.institucion}
           </p>
           <p className="mt-1 text-base font-extrabold uppercase leading-tight tracking-[0.08em] text-white">
-            {usuarioActual.unidad || ajustes.unidadPorDefecto}
+            {ajustes.subtitulo}
           </p>
           <p className="mt-1 text-xs font-medium text-slate-400">FRMS · Gestión de fatiga</p>
         </div>
