@@ -1,22 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useApp } from '../store/contexto'
 import type { AjustesInstitucionales } from '../domain/usuarios'
 import { descargarArchivo } from '../lib/almacenamiento'
-import { api, type RegistroAuditoria } from '../lib/api'
 
 export function Ajustes() {
   const { ajustes, actualizarAjustes, reiniciarDatos, usuarios, checkins, registros } = useApp()
   const [borrador, setBorrador] = useState<AjustesInstitucionales>(ajustes)
   const [guardado, setGuardado] = useState(false)
   const [error, setError] = useState('')
-  const [auditoria, setAuditoria] = useState<RegistroAuditoria[]>([])
-
-  useEffect(() => {
-    void api
-      .auditoria()
-      .then(setAuditoria)
-      .catch(() => setAuditoria([]))
-  }, [])
 
   const guardar = async () => {
     const fallo = await actualizarAjustes(borrador)
@@ -32,7 +23,7 @@ export function Ajustes() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-white">Ajustes institucionales</h1>
+        <h1 className="text-xl font-bold text-white">Variables y parámetros del sistema</h1>
         <p className="mt-1 text-sm text-slate-400">
           Parámetros del algoritmo y de la unidad. Aplican a check-ins y evaluaciones nuevas.
         </p>
@@ -172,27 +163,6 @@ export function Ajustes() {
             Reiniciar datos demo
           </button>
         </div>
-      </section>
-
-      <section className="card">
-        <h2 className="section-title">Auditoría reciente</h2>
-        {auditoria.length === 0 ? (
-          <p className="text-sm text-slate-400">Sin eventos registrados.</p>
-        ) : (
-          <ul className="max-h-72 space-y-2 overflow-y-auto text-sm">
-            {auditoria.slice(0, 50).map((evento) => (
-              <li key={evento.id} className="flex justify-between gap-4 border-b border-white/5 pb-1">
-                <span className="text-slate-300">
-                  {evento.accion}
-                  {evento.detalle && <span className="text-slate-500"> · {evento.detalle}</span>}
-                </span>
-                <span className="shrink-0 text-xs text-slate-500">
-                  {new Date(evento.creadoEn).toLocaleString('es-EC')}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
     </div>
   )

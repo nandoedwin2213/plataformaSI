@@ -1,6 +1,5 @@
 import crypto from 'node:crypto'
 import {
-  CORREO_ADMIN,
   asegurarAdministrador,
   esCorreoAdmin,
   nuevoId,
@@ -24,10 +23,11 @@ export function normalizarCorreo(valor) {
 }
 
 function correosDePrueba() {
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL) return []
   return (process.env.CORREOS_PRUEBA ?? '')
     .split(',')
     .map((item) => item.trim().toLowerCase())
-    .filter((item) => item && item !== CORREO_ADMIN)
+    .filter(Boolean)
 }
 
 export function esCorreoDePrueba(correo) {
@@ -35,7 +35,8 @@ export function esCorreoDePrueba(correo) {
 }
 
 function hashear(codigo) {
-  return crypto.createHash('sha256').update(codigo).digest('hex')
+  const secreto = process.env.JWT_SECRETO ?? 'secreto-desarrollo'
+  return crypto.createHmac('sha256', secreto).update(codigo).digest('hex')
 }
 
 function generarCodigo() {
@@ -100,7 +101,9 @@ export async function validarCodigo(correo, codigo) {
     return { error: 'Código inválido o expirado' }
   }
 
-  if (fila.codigo_hash !== hashear(codigo)) {
+  const esperado = Buffer.from(fila.codigo_hash, 'hex')
+  const recibido = Buffer.from(hashear(codigo), 'hex')
+  if (esperado.length !== recibido.length || !crypto.timingSafeEqual(esperado, recibido)) {
     await pool.query('UPDATE codigos_acceso SET intentos = intentos + 1 WHERE id = $1', [fila.id])
     return { error: 'Código inválido o expirado' }
   }

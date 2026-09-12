@@ -93,8 +93,8 @@ export function Ficha() {
             Imprimir informe
           </button>
           {usuarioActual.rol === 'admin' && (
-            <Link to="/tablero" className="btn-ghost">
-              Volver al tablero
+            <Link to="/admin/estadisticas" className="btn-ghost">
+              Volver a estadísticas
             </Link>
           )}
         </div>

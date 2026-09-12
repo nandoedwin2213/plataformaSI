@@ -43,3 +43,12 @@ export function exigirAdministrador(peticion, respuesta, siguiente) {
   }
   return siguiente()
 }
+
+export function exigirEvaluado(peticion, respuesta, siguiente) {
+  if (peticion.usuario?.rol !== 'evaluado') {
+    return respuesta
+      .status(403)
+      .json({ error: 'El administrador no participa en los instrumentos de evaluación' })
+  }
+  return siguiente()
+}

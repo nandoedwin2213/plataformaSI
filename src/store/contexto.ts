@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react'
 import type { RegistroHistorial } from '../domain/types'
 import type { AjustesInstitucionales, CheckIn, Usuario } from '../domain/usuarios'
+import type { InstrumentoDisponible, ValorRespuesta } from '../domain/instrumentos'
 import type { DatosCheckIn, DatosNuevoUsuario, ModoAcceso, RespuestaCodigo } from '../lib/api'
 
 export interface EstadoApp {
@@ -9,6 +10,7 @@ export interface EstadoApp {
   registros: RegistroHistorial[]
   checkins: CheckIn[]
   ajustes: AjustesInstitucionales
+  instrumentos: InstrumentoDisponible[]
   sinConexion: boolean
   solicitarCodigo: (
     correo: string,
@@ -22,6 +24,11 @@ export interface EstadoApp {
   crearUsuario: (datos: DatosNuevoUsuario) => Promise<string | null>
   actualizarUsuario: (id: string, datos: Partial<Usuario>) => Promise<void>
   eliminarUsuario: (id: string) => Promise<void>
+  guardarRespuestaInstrumento: (
+    instrumentoId: string,
+    respuestas: Record<string, ValorRespuesta>,
+    finalizar: boolean,
+  ) => Promise<void>
   actualizarAjustes: (ajustes: AjustesInstitucionales) => Promise<string | null>
   reiniciarDatos: () => Promise<void>
 }
