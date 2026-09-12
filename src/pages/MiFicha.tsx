@@ -3,6 +3,7 @@ import { useApp } from '../store/contexto'
 import { antecedentesMedicos, gradosMilitares } from '../domain/catalogos'
 import { calcularEdad, calcularImc } from '../domain/scoring'
 import { perfilVacio, type PerfilUsuario } from '../domain/usuarios'
+import { CampoNumero } from '../components/CampoNumero'
 
 export function MiFicha() {
   const { usuarioActual, actualizarUsuario, ajustes } = useApp()
@@ -141,7 +142,8 @@ export function MiFicha() {
               onChange={(evento) => cambiar('fechaNacimiento', evento.target.value)}
             />
             <p className="mt-1 text-xs text-slate-500">
-              {edad !== null ? `Edad: ${edad} años` : 'Edad: pendiente'}
+              {edad !== null ? `Edad: ${edad} años` : 'Edad: pendiente'} (se calcula sola a partir de esta
+              fecha; no hace falta escribirla)
             </p>
           </div>
         </div>
@@ -149,34 +151,37 @@ export function MiFicha() {
 
       <section className="card space-y-4">
         <h2 className="section-title">Datos biométricos y antecedentes</h2>
+        <p className="text-sm text-slate-400">
+          Se solicitan porque influyen en la calidad del sueño y en la rapidez con que se recupera la fatiga.
+          Puedes dejar un campo vacío si aún no lo conoces.
+        </p>
         <div className="grid gap-4 md:grid-cols-3">
-          <div>
-            <label className="label" htmlFor="peso">
-              Peso (kg)
-            </label>
-            <input
-              id="peso"
-              type="number"
-              className="input"
-              value={perfil.pesoKg}
-              onChange={(evento) => cambiar('pesoKg', Number(evento.target.value))}
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="talla">
-              Talla (cm)
-            </label>
-            <input
-              id="talla"
-              type="number"
-              className="input"
-              value={perfil.tallaCm}
-              onChange={(evento) => cambiar('tallaCm', Number(evento.target.value))}
-            />
-          </div>
+          <CampoNumero
+            id="peso"
+            etiqueta="Peso (kg)"
+            valor={perfil.pesoKg}
+            min={35}
+            max={200}
+            paso={0.5}
+            ayuda="(peso corporal actual en kilogramos; se usa únicamente para calcular el IMC)"
+            onCambio={(valor) => cambiar('pesoKg', valor)}
+          />
+          <CampoNumero
+            id="talla"
+            etiqueta="Talla (cm)"
+            valor={perfil.tallaCm}
+            min={130}
+            max={220}
+            ayuda="(estatura en centímetros, por ejemplo 172)"
+            onCambio={(valor) => cambiar('tallaCm', valor)}
+          />
           <div>
             <p className="label">IMC</p>
             <p className="mt-2 text-sm text-slate-300">{imc !== null ? imc.toFixed(1) : 'Pendiente'}</p>
+            <p className="mt-1 text-xs text-slate-400">
+              (índice de masa corporal = peso en kg ÷ talla en metros al cuadrado. Menos de 25 = normal, 25 a
+              29,9 = sobrepeso, 30 o más = obesidad; un IMC alto se asocia a apnea del sueño y peor descanso)
+            </p>
           </div>
         </div>
         <div className="grid gap-2 md:grid-cols-2">
@@ -206,6 +211,10 @@ export function MiFicha() {
 
       <section className="card space-y-4">
         <h2 className="section-title">Información profesional</h2>
+        <p className="text-sm text-slate-400">
+          Funciones y cargos que cumples (sirven para detectar acumulación de responsabilidades y falta de
+          relevos, una de las causas principales de la fatiga crónica).
+        </p>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="label" htmlFor="funcionPrincipal">

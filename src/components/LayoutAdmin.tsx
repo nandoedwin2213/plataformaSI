@@ -1,5 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useApp } from '../store/contexto'
+import { Ambiente, BotonTema } from './Tema'
+import { useTema } from '../lib/tema'
 
 const enlaces = [
   { ruta: '/admin', texto: 'Dashboard', exacto: true },
@@ -16,11 +18,13 @@ const enlaces = [
 export function LayoutAdmin() {
   const { usuarioActual, cerrarSesion, ajustes } = useApp()
   const navegar = useNavigate()
+  const { tema, alternar } = useTema()
 
   if (!usuarioActual) return null
 
   return (
     <div className="min-h-screen lg:flex">
+      <Ambiente />
       <aside className="border-b border-white/10 bg-slate-950/80 backdrop-blur lg:min-h-screen lg:w-64 lg:border-b-0 lg:border-r no-print">
         <div className="px-5 py-5">
           <p className="text-[10px] uppercase tracking-[0.3em] text-amber-400">{ajustes.institucion}</p>
@@ -55,15 +59,18 @@ export function LayoutAdmin() {
               {usuarioActual.correo} · Administrador único del sistema
             </p>
           </div>
-          <button
-            className="btn-ghost"
-            onClick={() => {
-              cerrarSesion()
-              navegar('/login')
-            }}
-          >
-            Cerrar sesión
-          </button>
+          <div className="flex items-center gap-3">
+            <BotonTema tema={tema} onAlternar={alternar} />
+            <button
+              className="btn-ghost"
+              onClick={() => {
+                cerrarSesion()
+                navegar('/login')
+              }}
+            >
+              Cerrar sesión
+            </button>
+          </div>
         </header>
 
         <main className="px-5 py-6">

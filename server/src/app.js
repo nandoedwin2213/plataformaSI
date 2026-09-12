@@ -480,6 +480,51 @@ app.get(
   }),
 )
 
+// Borrado institucional de la información del personal evaluado. Conserva la cuenta
+// administrativa, los instrumentos, el modelo de riesgo, las estrategias y los parámetros.
+app.post(
+  '/api/admin/datos/reiniciar',
+  asincrono(autenticar),
+  exigirAdministrador,
+  asincrono(async (peticion, respuesta) => {
+    if (peticion.body?.confirmacion !== 'BORRAR DATOS') {
+      return respuesta.status(400).json({ error: 'Confirmación inválida' })
+    }
+
+    const { total: evaluados } = await unaFila(
+      "SELECT COUNT(*)::int AS total FROM usuarios WHERE rol = 'evaluado'",
+    )
+    const { total: aplicaciones } = await unaFila(
+      `SELECT COUNT(*)::int AS total FROM respuestas_instrumento r
+       JOIN usuarios u ON u.id = r.usuario_id WHERE u.rol = 'evaluado'`,
+    )
+    const { total: checkins } = await unaFila(
+      `SELECT COUNT(*)::int AS total FROM checkins c
+       JOIN usuarios u ON u.id = c.usuario_id WHERE u.rol = 'evaluado'`,
+    )
+
+    const cliente = await pool.connect()
+    try {
+      await cliente.query('BEGIN')
+      await cliente.query("DELETE FROM usuarios WHERE rol = 'evaluado'")
+      await cliente.query("DELETE FROM codigos_acceso WHERE rol = 'evaluado'")
+      await cliente.query('COMMIT')
+    } catch (error) {
+      await cliente.query('ROLLBACK')
+      throw error
+    } finally {
+      cliente.release()
+    }
+
+    await registrarAuditoria(
+      peticion.usuario.id,
+      'reinicio_datos_evaluados',
+      `${evaluados} evaluados, ${aplicaciones} aplicaciones, ${checkins} check-ins`,
+    )
+    return respuesta.json({ evaluados, aplicaciones, checkins })
+  }),
+)
+
 app.post(
   '/api/reiniciar',
   asincrono(autenticar),

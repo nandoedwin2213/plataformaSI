@@ -124,6 +124,7 @@ function normalizarRespuesta(pregunta, valor) {
     const valido = pregunta.opciones.some((opcion) => opcion.texto === elegido)
     return { vacia: !valido, valor: valido ? elegido : null }
   }
+  if (typeof valor === 'string' && valor.trim() === '') return { vacia: true, valor: null }
   const numero = Number(valor)
   if (!Number.isFinite(numero)) return { vacia: true, valor: null }
   return { vacia: false, valor: numero }
@@ -134,7 +135,7 @@ function puntajeDe(preguntas, respuestas) {
   let hayPuntaje = false
   for (const pregunta of preguntas) {
     const valor = respuestas[pregunta.id]
-    if (valor === undefined || valor === null) continue
+    if (valor === undefined || valor === null || valor === '') continue
     if (pregunta.tipo === 'escala' || pregunta.tipo === 'numero') {
       total += Number(valor)
       hayPuntaje = true
