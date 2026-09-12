@@ -3,7 +3,16 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
 import cors from 'cors'
-import { autenticar, esAdministrador, exigirAdministrador, firmarToken } from './auth.js'
+import {
+  autenticar,
+  esAdministrador,
+  exigirAdministrador,
+  exigirEvaluado,
+  firmarToken,
+} from './auth.js'
+import { rutasInstrumentos } from './instrumentos.js'
+import { rutasPanel } from './panel.js'
+import { recalcularRiesgo } from './servicioRiesgo.js'
 import {
   baseLista,
   consultar,
@@ -315,6 +324,7 @@ app.get(
 app.post(
   '/api/checkins',
   asincrono(autenticar),
+  exigirEvaluado,
   asincrono(async (peticion, respuesta) => {
     const cuerpo = peticion.body ?? {}
     const hoy = new Date().toISOString().slice(0, 10)
@@ -359,6 +369,7 @@ app.post(
       ],
     )
     await registrarAuditoria(peticion.usuario.id, 'checkin', fecha)
+    await recalcularRiesgo(peticion.usuario.id, 'registro_diario')
     const fila = await unaFila('SELECT * FROM checkins WHERE usuario_id = $1 AND fecha = $2', [
       peticion.usuario.id,
       fecha,
@@ -383,14 +394,13 @@ app.get(
 app.post(
   '/api/registros',
   asincrono(autenticar),
+  exigirEvaluado,
   asincrono(async (peticion, respuesta) => {
-    const { evaluacion, resultado, usuarioId } = peticion.body ?? {}
+    const { evaluacion, resultado } = peticion.body ?? {}
     if (!evaluacion || !resultado) {
       return respuesta.status(400).json({ error: 'Evaluación y resultado son obligatorios' })
     }
-    const destino = esAdministrador(peticion.usuario) && usuarioId ? usuarioId : peticion.usuario.id
-    const existe = await unaFila('SELECT 1 FROM usuarios WHERE id = $1', [destino])
-    if (!existe) return respuesta.status(400).json({ error: 'Usuario destino inexistente' })
+    const destino = peticion.usuario.id
 
     const id = nuevoId()
     await pool.query(
@@ -419,10 +429,20 @@ app.delete(
   }),
 )
 
+// El evaluado solo recibe los parámetros necesarios para calcular y mostrar su propio resultado;
+// la configuración institucional completa queda reservada al administrador.
 app.get(
   '/api/ajustes',
   asincrono(autenticar),
-  asincrono(async (_peticion, respuesta) => respuesta.json(await leerAjustes())),
+  asincrono(async (peticion, respuesta) => {
+    const ajustes = await leerAjustes()
+    if (esAdministrador(peticion.usuario)) return respuesta.json(ajustes)
+    return respuesta.json({
+      institucion: ajustes.institucion,
+      umbrales: ajustes.umbrales,
+      jornadaReferencia: ajustes.jornadaReferencia,
+    })
+  }),
 )
 
 app.put(
@@ -466,7 +486,10 @@ app.post(
   exigirAdministrador,
   asincrono(async (_peticion, respuesta) => {
     await pool.query(
-      'TRUNCATE registros, checkins, auditoria, usuarios, codigos_acceso RESTART IDENTITY CASCADE',
+      `TRUNCATE registros, checkins, auditoria, usuarios, codigos_acceso,
+                respuestas_instrumento, preguntas, instrumentos, evaluaciones_riesgo,
+                lineas_base, alertas, reglas_alerta, estrategias_mitigacion, modelos_riesgo
+                RESTART IDENTITY CASCADE`,
     )
     await pool.query('DELETE FROM ajustes')
     reiniciarInicializacion()
@@ -480,6 +503,9 @@ app.post(
     respuesta.json({ estado: 'reiniciado' })
   }),
 )
+
+app.use(rutasInstrumentos)
+app.use(rutasPanel)
 
 const raizProyecto = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const carpetaEstatica = path.join(raizProyecto, 'dist')

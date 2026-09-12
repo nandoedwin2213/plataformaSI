@@ -11,6 +11,7 @@ import {
   type DatosNuevoUsuario,
   type ModoAcceso,
 } from '../lib/api'
+import type { InstrumentoDisponible, ValorRespuesta } from '../domain/instrumentos'
 import { ContextoApp, type EstadoApp } from './contexto'
 
 function mensajeError(error: unknown): string {
@@ -26,18 +27,31 @@ export function ProveedorApp({ children }: { children: ReactNode }) {
   const [registros, setRegistros] = useState<RegistroHistorial[]>([])
   const [checkins, setCheckins] = useState<CheckIn[]>([])
   const [ajustes, setAjustes] = useState<AjustesInstitucionales>(ajustesPorDefecto)
+  const [instrumentos, setInstrumentos] = useState<InstrumentoDisponible[]>([])
 
-  const cargarDatos = useCallback(async () => {
-    const [listaUsuarios, listaRegistros, listaCheckins, configuracion] = await Promise.all([
+  // El administrador nunca carga instrumentos para responder ni la población completa: sus
+  // pantallas consultan agregados y páginas del panel, de modo que el tamaño del personal no
+  // afecta al arranque de la sesión.
+  const cargarDatos = useCallback(async (usuario: Usuario) => {
+    const configuracion = await api.ajustes()
+    setAjustes({ ...ajustesPorDefecto, ...configuracion })
+    if (usuario.rol !== 'evaluado') {
+      setUsuarios([])
+      setRegistros([])
+      setCheckins([])
+      setInstrumentos([])
+      return
+    }
+    const [listaUsuarios, listaRegistros, listaCheckins, listaInstrumentos] = await Promise.all([
       api.usuarios(),
       api.registros(),
       api.checkins(),
-      api.ajustes(),
+      api.instrumentos().catch(() => []),
     ])
     setUsuarios(listaUsuarios)
     setRegistros(listaRegistros)
     setCheckins(listaCheckins)
-    setAjustes(configuracion)
+    setInstrumentos(listaInstrumentos)
   }, [])
 
   useEffect(() => {
@@ -52,8 +66,9 @@ export function ProveedorApp({ children }: { children: ReactNode }) {
       }
       if (leerToken()) {
         try {
-          setUsuarioActual(await api.sesion())
-          await cargarDatos()
+          const usuario = await api.sesion()
+          setUsuarioActual(usuario)
+          await cargarDatos(usuario)
         } catch {
           guardarToken(null)
           setUsuarioActual(null)
@@ -79,7 +94,7 @@ export function ProveedorApp({ children }: { children: ReactNode }) {
         guardarToken(token)
         setUsuarioActual(usuario)
         setSinConexion(false)
-        await cargarDatos()
+        await cargarDatos(usuario)
         return null
       } catch (error) {
         return mensajeError(error)
@@ -95,6 +110,7 @@ export function ProveedorApp({ children }: { children: ReactNode }) {
     setUsuarios([])
     setRegistros([])
     setCheckins([])
+    setInstrumentos([])
   }, [])
 
   const guardarRegistro = useCallback(
@@ -142,6 +158,16 @@ export function ProveedorApp({ children }: { children: ReactNode }) {
     setUsuarios((previos) => previos.filter((item) => item.id !== id))
   }, [])
 
+  const guardarRespuestaInstrumento = useCallback(
+    async (instrumentoId: string, respuestas: Record<string, ValorRespuesta>, finalizar: boolean) => {
+      const guardada = await api.guardarRespuestaInstrumento(instrumentoId, respuestas, finalizar)
+      // Tras finalizar cambian la disponibilidad, el conteo de aplicaciones y la próxima fecha.
+      setInstrumentos(await api.instrumentos().catch(() => []))
+      return guardada
+    },
+    [],
+  )
+
   const actualizarAjustes = useCallback(async (nuevos: AjustesInstitucionales) => {
     try {
       setAjustes(await api.actualizarAjustes(nuevos))
@@ -158,6 +184,7 @@ export function ProveedorApp({ children }: { children: ReactNode }) {
     setUsuarios([])
     setRegistros([])
     setCheckins([])
+    setInstrumentos([])
     setAjustes(ajustesPorDefecto)
   }, [])
 
@@ -168,6 +195,7 @@ export function ProveedorApp({ children }: { children: ReactNode }) {
       registros,
       checkins,
       ajustes,
+      instrumentos,
       sinConexion,
       solicitarCodigo,
       ingresarConCodigo,
@@ -178,6 +206,7 @@ export function ProveedorApp({ children }: { children: ReactNode }) {
       crearUsuario,
       actualizarUsuario,
       eliminarUsuario,
+      guardarRespuestaInstrumento,
       actualizarAjustes,
       reiniciarDatos,
     }),
@@ -187,6 +216,7 @@ export function ProveedorApp({ children }: { children: ReactNode }) {
       registros,
       checkins,
       ajustes,
+      instrumentos,
       sinConexion,
       solicitarCodigo,
       ingresarConCodigo,
@@ -197,6 +227,7 @@ export function ProveedorApp({ children }: { children: ReactNode }) {
       crearUsuario,
       actualizarUsuario,
       eliminarUsuario,
+      guardarRespuestaInstrumento,
       actualizarAjustes,
       reiniciarDatos,
     ],

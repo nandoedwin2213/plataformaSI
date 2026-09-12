@@ -52,7 +52,7 @@ Variables de entorno de la API:
 - `DATABASE_URL` (obligatoria): cadena de conexión PostgreSQL.
 - `JWT_SECRETO`: recomendada en producción; si falta, se genera y guarda en la tabla `configuracion`.
 - `RESEND_API_KEY` (obligatoria para enviar códigos): clave de [Resend](https://resend.com). Nunca se escribe en el repositorio.
-- `CORREO_REMITENTE`: remitente de los códigos, p. ej. `PlataformaSI <plataformasi@tu-dominio.com>`. Debe pertenecer a un dominio verificado en Resend; si no se define se usa `onboarding@resend.dev`, que solo puede enviar a la dirección dueña de la cuenta de Resend.
+- `CORREO_REMITENTE`: remitente de los códigos; en producción `PlataformaSI <no-responder@gestionfatiga.com>`. Debe pertenecer a un dominio verificado en Resend; si no se define se usa `onboarding@resend.dev`, que solo puede enviar a la dirección dueña de la cuenta de Resend.
 - `ADMIN_EMAIL`: correo del único administrador (por defecto `nandoedwin2213@gmail.com`).
 - `CORREOS_PRUEBA`: solo para desarrollo; lista separada por comas de correos que reciben el código en la respuesta HTTP en lugar de por email.
 - `PORT` (o `PUERTO` en local): puerto de escucha, 3001 por defecto.
@@ -70,7 +70,7 @@ Variables de entorno de la API:
 1. Crear la base en [Neon](https://neon.tech) y copiar la cadena de conexión.
 2. Importar el repositorio en Vercel; `vercel.json` compila el frontend a `dist/` y publica `api/index.js` como función serverless que monta la misma API Express.
 3. Configurar `DATABASE_URL`, `JWT_SECRETO`, `RESEND_API_KEY`, `CORREO_REMITENTE` y `ADMIN_EMAIL` como variables de entorno del proyecto (nunca en el repositorio). `JWT_SECRETO` es obligatoria en Vercel para que las sesiones sobrevivan entre instancias, y `CORREOS_PRUEBA` debe quedar sin definir.
-4. En Resend: verificar el dominio desde el que se enviarán los códigos (DNS: SPF/DKIM) y usar ese dominio en `CORREO_REMITENTE`. Sin dominio verificado solo se puede enviar al correo propietario de la cuenta.
+4. En Resend: el dominio de envío es `gestionfatiga.com` (región `sa-east-1`). En el DNS del dominio deben existir `TXT resend._domainkey`, `CNAME rsend → rsend-sae1.forge.rmta.net` y `CNAME send → send.forge.rmta.net`, y luego pulsar «Verify DNS Records». Sin dominio verificado solo se puede enviar al correo propietario de la cuenta.
 5. Verificar `https://<proyecto>.vercel.app/api/salud`.
 
 El esquema y los datos demo se crean automáticamente en el primer arranque si la base está vacía.

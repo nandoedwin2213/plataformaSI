@@ -1,5 +1,27 @@
 import type { RegistroHistorial } from '../domain/types'
 import type { AjustesInstitucionales, CheckIn, Usuario } from '../domain/usuarios'
+import type {
+  DatosPregunta,
+  Instrumento,
+  InstrumentoDisponible,
+  PaginaAplicaciones,
+  Pregunta,
+  RespuestaGuardada,
+  RespuestaInstrumento,
+  ResumenAdmin,
+  ValorRespuesta,
+} from '../domain/instrumentos'
+import type {
+  Alerta,
+  DefinicionModelo,
+  DetallePersona,
+  EstrategiaMitigacion,
+  MiRiesgo,
+  ModeloRiesgo,
+  PaginaPersonas,
+  ReglaAlerta,
+  ResumenPoblacional,
+} from '../domain/riesgo'
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 const CLAVE_TOKEN = 'fae-fatiga-token'
@@ -68,6 +90,32 @@ export interface RegistroAuditoria {
   creadoEn: string
 }
 
+export interface FiltroPersonas {
+  pagina?: number
+  tam?: number
+  nivel?: string
+  unidad?: string
+  grado?: string
+  busqueda?: string
+  conAlerta?: boolean
+  sinDatos?: boolean
+  orden?: 'puntaje' | 'nombre'
+}
+
+export interface FiltroAplicaciones {
+  pagina?: number
+  tam?: number
+  instrumento?: string
+  estado?: 'borrador' | 'finalizada'
+}
+
+function consulta(parametros: FiltroPersonas | FiltroAplicaciones): string {
+  const partes = Object.entries(parametros)
+    .filter(([, valor]) => valor !== undefined && valor !== '' && valor !== false)
+    .map(([clave, valor]) => `${clave}=${encodeURIComponent(String(valor))}`)
+  return partes.length ? `?${partes.join('&')}` : ''
+}
+
 export const api = {
   salud: () => pedir<{ estado: string }>('/api/salud'),
   solicitarCodigo: (correo: string, modo: ModoAcceso) =>
@@ -100,4 +148,72 @@ export const api = {
     pedir<AjustesInstitucionales>('/api/ajustes', { method: 'PUT', body: JSON.stringify(datos) }),
   auditoria: () => pedir<RegistroAuditoria[]>('/api/auditoria'),
   reiniciar: () => pedir<{ estado: string }>('/api/reiniciar', { method: 'POST' }),
+
+  // Instrumentos configurables: lectura y respuesta del evaluado
+  instrumentos: () => pedir<InstrumentoDisponible[]>('/api/instrumentos'),
+  guardarRespuestaInstrumento: (
+    instrumentoId: string,
+    respuestas: Record<string, ValorRespuesta>,
+    finalizar: boolean,
+  ) =>
+    pedir<RespuestaGuardada>(`/api/instrumentos/${instrumentoId}/respuesta`, {
+      method: 'PUT',
+      body: JSON.stringify({ respuestas, finalizar }),
+    }),
+  historialInstrumento: (instrumentoId: string) =>
+    pedir<RespuestaInstrumento[]>(`/api/instrumentos/${instrumentoId}/historial`),
+  miRiesgo: () => pedir<MiRiesgo>('/api/mi-riesgo'),
+
+  // Administración
+  resumenAdmin: () => pedir<ResumenAdmin>('/api/admin/resumen'),
+  instrumentosAdmin: () => pedir<Instrumento[]>('/api/admin/instrumentos'),
+  crearInstrumento: (datos: { nombre: string; descripcion: string }) =>
+    pedir<Instrumento>('/api/admin/instrumentos', { method: 'POST', body: JSON.stringify(datos) }),
+  actualizarInstrumento: (
+    id: string,
+    datos: Partial<Pick<Instrumento, 'nombre' | 'descripcion' | 'activo' | 'orden'>>,
+  ) => pedir<Instrumento>(`/api/admin/instrumentos/${id}`, { method: 'PUT', body: JSON.stringify(datos) }),
+  eliminarInstrumento: (id: string) => pedir<void>(`/api/admin/instrumentos/${id}`, { method: 'DELETE' }),
+  crearPregunta: (instrumentoId: string, datos: DatosPregunta) =>
+    pedir<Pregunta>(`/api/admin/instrumentos/${instrumentoId}/preguntas`, {
+      method: 'POST',
+      body: JSON.stringify(datos),
+    }),
+  actualizarPregunta: (id: string, datos: Partial<DatosPregunta> & { orden?: number }) =>
+    pedir<Pregunta>(`/api/admin/preguntas/${id}`, { method: 'PUT', body: JSON.stringify(datos) }),
+  eliminarPregunta: (id: string) => pedir<void>(`/api/admin/preguntas/${id}`, { method: 'DELETE' }),
+  respuestasAdmin: (parametros: FiltroAplicaciones = {}) =>
+    pedir<PaginaAplicaciones>(`/api/admin/respuestas${consulta(parametros)}`),
+
+  // Panel poblacional y motor de riesgo
+  panelResumen: () => pedir<ResumenPoblacional>('/api/admin/panel/resumen'),
+  panelPersonas: (parametros: FiltroPersonas = {}) =>
+    pedir<PaginaPersonas>(`/api/admin/panel/personas${consulta(parametros)}`),
+  panelFiltros: () => pedir<{ unidades: string[]; grados: string[] }>('/api/admin/panel/filtros'),
+  panelPersona: (id: string) => pedir<DetallePersona>(`/api/admin/panel/personas/${id}`),
+  alertas: (estado = 'abierta') => pedir<Alerta[]>(`/api/admin/alertas?estado=${estado}`),
+  actualizarAlerta: (id: string, datos: { estado: Alerta['estado']; nota?: string }) =>
+    pedir<Alerta>(`/api/admin/alertas/${id}`, { method: 'PUT', body: JSON.stringify(datos) }),
+  modelos: () => pedir<ModeloRiesgo[]>('/api/admin/modelo'),
+  crearVersionModelo: (datos: { definicion: DefinicionModelo; nombre?: string; nota?: string }) =>
+    pedir<{ version: number }>('/api/admin/modelo', { method: 'POST', body: JSON.stringify(datos) }),
+  activarModelo: (version: number) =>
+    pedir<{ version: number }>(`/api/admin/modelo/${version}/activar`, { method: 'PUT' }),
+  recalcularModelo: () =>
+    pedir<{ evaluados: number; versionModelo: number; milisegundos: number }>(
+      '/api/admin/modelo/recalcular',
+      { method: 'POST' },
+    ),
+  reglasAlerta: () => pedir<ReglaAlerta[]>('/api/admin/reglas-alerta'),
+  actualizarReglaAlerta: (id: string, datos: Partial<ReglaAlerta>) =>
+    pedir<ReglaAlerta>(`/api/admin/reglas-alerta/${id}`, { method: 'PUT', body: JSON.stringify(datos) }),
+  estrategias: () => pedir<EstrategiaMitigacion[]>('/api/admin/estrategias'),
+  crearEstrategia: (datos: Partial<EstrategiaMitigacion>) =>
+    pedir<EstrategiaMitigacion>('/api/admin/estrategias', { method: 'POST', body: JSON.stringify(datos) }),
+  actualizarEstrategia: (id: string, datos: Partial<EstrategiaMitigacion>) =>
+    pedir<EstrategiaMitigacion>(`/api/admin/estrategias/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(datos),
+    }),
+  eliminarEstrategia: (id: string) => pedir<void>(`/api/admin/estrategias/${id}`, { method: 'DELETE' }),
 }

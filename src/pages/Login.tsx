@@ -64,7 +64,7 @@ export function Login() {
       setError(fallo)
       return
     }
-    navegar('/inicio')
+    navegar('/')
   }
 
   return (

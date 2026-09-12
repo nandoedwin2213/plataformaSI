@@ -181,7 +181,10 @@ export function Tablero() {
             {alertas.map((fila) => (
               <tr key={fila.usuario.id} className="border-b border-white/5 last:border-0">
                 <td className="py-2 pr-4">
-                  <Link to={`/ficha/${fila.usuario.id}`} className="text-slate-200 hover:text-cyan-300">
+                  <Link
+                    to={`/admin/personal/${fila.usuario.id}`}
+                    className="text-slate-200 hover:text-cyan-300"
+                  >
                     {fila.usuario.grado} {fila.usuario.nombre}
                   </Link>
                 </td>
