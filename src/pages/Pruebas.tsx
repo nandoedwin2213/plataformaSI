@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useApp } from '../store/contexto'
 import type { InstrumentoDisponible } from '../domain/instrumentos'
 import { etiquetaDominio } from '../domain/riesgo'
+import { textoDisponibilidad, textoFrecuencia } from '../domain/periodicidad'
 
 function frecuenciaTexto(dias: number): string {
   if (dias <= 1) return 'Aplicación diaria'
@@ -31,7 +32,10 @@ function Tarjeta({ instrumento }: { instrumento: InstrumentoDisponible }) {
       <dl className="grid grid-cols-2 gap-3 text-xs text-slate-400 sm:grid-cols-4">
         <div>
           <dt className="text-slate-500">Frecuencia</dt>
-          <dd>{frecuenciaTexto(instrumento.frecuenciaDias)}</dd>
+          <dd>
+            {frecuenciaTexto(instrumento.frecuenciaDias)} (se llena{' '}
+            {textoFrecuencia(instrumento.frecuenciaDias)})
+          </dd>
         </div>
         <div>
           <dt className="text-slate-500">Aplicaciones</dt>
@@ -44,6 +48,10 @@ function Tarjeta({ instrumento }: { instrumento: InstrumentoDisponible }) {
         <div>
           <dt className="text-slate-500">Última fecha</dt>
           <dd>{ultima?.finalizadoEn?.slice(0, 10) ?? 'Sin aplicar'}</dd>
+        </div>
+        <div className="col-span-2 sm:col-span-4">
+          <dt className="text-slate-500">Próxima aplicación</dt>
+          <dd>{textoDisponibilidad(ultima?.finalizadoEn, instrumento.frecuenciaDias)}</dd>
         </div>
       </dl>
 
