@@ -1,0 +1,17 @@
+{
+  "name": "FAE · Gestión de riesgos de fatiga",
+  "short_name": "Fatiga FAE",
+  "description": "Plataforma institucional de diagnóstico preventivo, vigilancia y mitigación de la fatiga del personal militar.",
+  "lang": "es",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "icons": [
+    { "src": "/icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icono-256.png", "sizes": "256x256", "type": "image/png", "purpose": "any" },
+    { "src": "/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

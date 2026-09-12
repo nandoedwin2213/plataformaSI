@@ -75,6 +75,12 @@ Variables de entorno de la API:
 
 El esquema y los datos demo se crean automáticamente en el primer arranque si la base está vacía.
 
+## Instalación como aplicación de escritorio
+
+La plataforma es una PWA instalable: `public/manifest.webmanifest` define el nombre, el color y los iconos (`public/icono-*.png`), y `public/sw.js` es un service worker mínimo que solo habilita la instalación (no cachea respuestas, para que los datos de fatiga nunca se muestren obsoletos).
+
+Para instalarla en Windows/macOS/Linux: abrir la plataforma en Chrome o Edge → menú `···` → «Instalar página como app…» (o el icono de instalar en la barra de direcciones). Queda como ventana propia con su icono en el escritorio y el menú de inicio. En Android/iOS: «Añadir a pantalla de inicio».
+
 ## Aviso
 
 Herramienta de apoyo a la decisión: no sustituye el criterio del médico de aviación ni la normativa vigente de la unidad.
