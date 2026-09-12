@@ -3,6 +3,7 @@ import { useApp } from '../store/contexto'
 import { LineaTendencia, MapaCalor } from '../components/Graficos'
 import { colorNivel, etiquetaNivel } from '../domain/catalogos'
 import { proyectarFatiga } from '../domain/prediccion'
+import { DIAS_EVALUACION_COMPLETA, textoDisponibilidad, textoFrecuencia } from '../domain/periodicidad'
 
 function ultimosDias(cantidad: number): string[] {
   const dias: string[] = []
@@ -42,6 +43,10 @@ export function Inicio() {
     proyeccion?.dias.map((dia) => ({ etiqueta: dia.fecha.slice(5), valor: dia.puntaje })) ?? []
 
   const pendientes = instrumentos.filter((instrumento) => instrumento.disponible)
+  const ultimaEvaluacion = misEvaluaciones
+    .map((registro) => registro.creadoEn)
+    .sort()
+    .at(-1)
 
   return (
     <div className="space-y-6">
@@ -98,6 +103,36 @@ export function Inicio() {
           </p>
         </section>
       </div>
+
+      <section className="card">
+        <h2 className="section-title">¿Cada cuánto se llena cada cosa?</h2>
+        <ul className="space-y-1 text-sm text-slate-400">
+          <li>
+            <span className="text-slate-200">Check-in diario</span>: una vez al día ·{' '}
+            {checkinHoy ? 'ya registrado hoy, el siguiente mañana' : 'pendiente de hoy'}.
+          </li>
+          <li>
+            <span className="text-slate-200">Evaluación completa</span>: una vez por semana (cada{' '}
+            {DIAS_EVALUACION_COMPLETA} días), o antes si cambia la operación ·{' '}
+            {textoDisponibilidad(ultimaEvaluacion, DIAS_EVALUACION_COMPLETA).toLowerCase()}.
+          </li>
+          <li>
+            <span className="text-slate-200">Mis evaluaciones</span>: es solo consulta del historial, se
+            revisa cuando quieras.
+          </li>
+          {instrumentos.map((instrumento) => (
+            <li key={instrumento.id}>
+              <span className="text-slate-200">{instrumento.nombre}</span>:{' '}
+              {textoFrecuencia(instrumento.frecuenciaDias)} ·{' '}
+              {textoDisponibilidad(
+                instrumento.ultimaAplicacion?.finalizadoEn,
+                instrumento.frecuenciaDias,
+              ).toLowerCase()}
+              .
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <section className="card">
         <h2 className="section-title">Evaluaciones asignadas</h2>

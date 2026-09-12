@@ -70,6 +70,10 @@ export function CheckInDiario() {
         <p className="mt-1 text-sm text-slate-400">
           Registro rápido previo al servicio ({hoy}). Toma menos de un minuto y alimenta el tablero de la unidad.
         </p>
+        <p className="mt-1 text-xs text-slate-500">
+          Periodicidad: una vez al día (se puede actualizar las veces que haga falta dentro del mismo día;
+          el siguiente corresponde mañana).
+        </p>
       </div>
 
       {yaRegistrado && !guardado && (

@@ -5,10 +5,11 @@ import { evaluacionInicial } from '../domain/catalogos'
 import { evaluarFatiga } from '../domain/scoring'
 import type { Evaluacion as EvaluacionDatos, Resultado } from '../domain/types'
 import { aplicarPerfil } from '../domain/usuarios'
+import { DIAS_EVALUACION_COMPLETA, textoDisponibilidad } from '../domain/periodicidad'
 import { useApp } from '../store/contexto'
 
 export function Evaluacion() {
-  const { usuarioActual, ajustes, guardarRegistro } = useApp()
+  const { usuarioActual, ajustes, guardarRegistro, registros } = useApp()
   const [evaluacion, setEvaluacion] = useState<EvaluacionDatos>(() =>
     usuarioActual ? aplicarPerfil(evaluacionInicial, usuarioActual) : evaluacionInicial,
   )
@@ -17,6 +18,12 @@ export function Evaluacion() {
   const [error, setError] = useState('')
 
   if (!usuarioActual) return null
+
+  const ultima = registros
+    .filter((registro) => registro.usuarioId === usuarioActual.id)
+    .map((registro) => registro.creadoEn)
+    .sort()
+    .at(-1)
 
   const guardar = async (datos: Resultado) => {
     try {
@@ -34,6 +41,12 @@ export function Evaluacion() {
         <h1 className="text-xl font-bold text-white">Evaluación completa de fatiga</h1>
         <p className="mt-1 text-sm text-slate-400">
           Instrumento extendido: perfil biomédico, cargos y jornada, escalas KSS, Samn-Perelli y Epworth.
+        </p>
+        <p className="mt-1 text-xs text-slate-500">
+          Periodicidad recomendada: una vez por semana (cada {DIAS_EVALUACION_COMPLETA} días), o antes si
+          cambia la operación. Última: {ultima ? ultima.slice(0, 10) : 'sin registros'} ·{' '}
+          {textoDisponibilidad(ultima, DIAS_EVALUACION_COMPLETA)}. No está bloqueada: puedes repetirla
+          cuando lo necesites.
         </p>
       </div>
 
