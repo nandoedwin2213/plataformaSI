@@ -77,12 +77,18 @@ export function Login() {
         <BotonTema tema={tema} onAlternar={alternar} />
       </div>
       <div className="w-full max-w-md">
-        <div className="mb-6 text-center">
-          <p className="text-xs uppercase tracking-[0.35em] text-cyan-400">{ajustes.institucion}</p>
-          <h1 className="mt-2 text-2xl font-extrabold text-white">
-            Plataforma de gestión de riesgos de fatiga
+        <div className="mb-8 text-center">
+          <h1 className="text-2xl font-black uppercase leading-tight tracking-[0.12em] text-white sm:text-4xl">
+            {ajustes.institucion}
           </h1>
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="mt-2 text-xs font-semibold uppercase tracking-[0.42em] text-cyan-400 sm:text-sm">
+            {ajustes.subtitulo}
+          </p>
+          <div className="mx-auto mt-4 h-px w-24 bg-gradient-to-r from-transparent via-cyan-400/70 to-transparent" />
+          <p className="mt-4 text-base font-semibold text-slate-200 sm:text-lg">
+            Plataforma de gestión de riesgos de fatiga
+          </p>
+          <p className="mt-2 text-xs text-slate-400 sm:text-sm">
             Acceso seguro con código de un solo uso enviado a tu correo institucional
           </p>
         </div>
