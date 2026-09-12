@@ -8,6 +8,7 @@ import express from 'express'
 import { autenticar, exigirAdministrador } from './auth.js'
 import { consultar, nuevoId, pool, registrarAuditoria, unaFila } from './db.js'
 import { NIVELES, explicar } from './modeloRiesgo.js'
+import { fechaInstitucional } from './fechas.js'
 import {
   estrategiasSugeridas,
   historialIntegrado,
@@ -37,7 +38,7 @@ rutasPanel.get(
   asincrono(autenticar),
   exigirAdministrador,
   asincrono(async (_peticion, respuesta) => {
-    const hoy = new Date().toISOString().slice(0, 10)
+    const hoy = fechaInstitucional()
     const hace7 = new Date(Date.now() - 7 * 86_400_000).toISOString()
     const hace30 = new Date(Date.now() - 30 * 86_400_000).toISOString()
 

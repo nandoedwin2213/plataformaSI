@@ -1,4 +1,5 @@
 import type { CargoMasDesgastante, Evaluacion, IntencionDejarCargo, NivelRiesgo, TipoMision } from './types'
+import { fechaLocal } from './fechas'
 
 export const gradosMilitares: { categoria: string; grados: string[] }[] = [
   {
@@ -139,7 +140,7 @@ export const evaluacionInicial: Evaluacion = {
   grado: 'Teniente',
   unidad: '',
   tipoMision: 'transporte',
-  fecha: new Date().toISOString().slice(0, 10),
+  fecha: fechaLocal(),
   fechaNacimiento: '',
   pesoKg: 75,
   tallaCm: 172,

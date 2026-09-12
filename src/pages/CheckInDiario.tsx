@@ -3,10 +3,11 @@ import { useApp } from '../store/contexto'
 import { evaluacionInicial, escalaKss, escalaSamnPerelli, etiquetaNivel, colorNivel } from '../domain/catalogos'
 import { evaluarFatiga } from '../domain/scoring'
 import { aplicarPerfil } from '../domain/usuarios'
+import { fechaLocal } from '../domain/fechas'
 
 export function CheckInDiario() {
   const { usuarioActual, ajustes, checkins, guardarCheckin } = useApp()
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = fechaLocal()
 
   const yaRegistrado = checkins.find(
     (item) => item.usuarioId === usuarioActual?.id && item.fecha === hoy,

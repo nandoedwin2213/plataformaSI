@@ -36,6 +36,7 @@ import {
   validarCodigo,
 } from './accesoCorreo.js'
 import { correoConfigurado, enviarCodigo } from './correo.js'
+import { fechaInstitucional } from './fechas.js'
 
 const app = express()
 app.use(cors())
@@ -327,7 +328,7 @@ app.post(
   exigirEvaluado,
   asincrono(async (peticion, respuesta) => {
     const cuerpo = peticion.body ?? {}
-    const hoy = new Date().toISOString().slice(0, 10)
+    const hoy = fechaInstitucional()
     const fecha = typeof cuerpo.fecha === 'string' ? cuerpo.fecha : hoy
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
       return respuesta.status(400).json({ error: 'Fecha inválida' })
