@@ -7,6 +7,7 @@ const enlaces = [
   { ruta: '/checkin', texto: 'Check-in diario' },
   { ruta: '/evaluacion', texto: 'Evaluación completa' },
   { ruta: '/pruebas', texto: 'Mis evaluaciones' },
+  { ruta: '/mi-riesgo', texto: 'Mi índice integrado' },
   { ruta: '/ficha', texto: 'Mi ficha longitudinal' },
   { ruta: '/historial', texto: 'Mi historial' },
   { ruta: '/guia', texto: 'Guía clínica' },

@@ -11,11 +11,14 @@ import { MiFicha } from './pages/MiFicha'
 import { Pruebas } from './pages/Pruebas'
 import { ResponderPrueba } from './pages/ResponderPrueba'
 import { HistorialPagina } from './pages/HistorialPagina'
-import { Tablero } from './pages/Tablero'
-import { Personal } from './pages/Personal'
+import { MiRiesgo } from './pages/MiRiesgo'
 import { Ajustes } from './pages/Ajustes'
 import { Guia } from './pages/Guia'
 import { PanelAdmin } from './pages/admin/PanelAdmin'
+import { Poblacion } from './pages/admin/Poblacion'
+import { DetalleEvaluado } from './pages/admin/DetalleEvaluado'
+import { Alertas } from './pages/admin/Alertas'
+import { ModeloRiesgo } from './pages/admin/ModeloRiesgo'
 import { EvaluacionesAdmin } from './pages/admin/Evaluaciones'
 import { TestsAdmin } from './pages/admin/Tests'
 import { Auditoria } from './pages/admin/Auditoria'
@@ -58,6 +61,7 @@ export default function App() {
         <Route path="/pruebas/:id" element={<ResponderPrueba />} />
         <Route path="/ficha" element={<Ficha />} />
         <Route path="/historial" element={<HistorialPagina />} />
+        <Route path="/mi-riesgo" element={<MiRiesgo />} />
         <Route path="/guia" element={<Guia />} />
       </Route>
 
@@ -71,11 +75,14 @@ export default function App() {
         }
       >
         <Route index element={<PanelAdmin />} />
-        <Route path="personal" element={<Personal />} />
-        <Route path="personal/:id" element={<Ficha />} />
+        <Route path="poblacion" element={<Poblacion />} />
+        <Route path="poblacion/:id" element={<DetalleEvaluado />} />
+        <Route path="personal" element={<Navigate to="/admin/poblacion" replace />} />
+        <Route path="personal/:id" element={<Navigate to="/admin/poblacion" replace />} />
         <Route path="evaluaciones" element={<EvaluacionesAdmin />} />
         <Route path="tests" element={<TestsAdmin />} />
-        <Route path="estadisticas" element={<Tablero />} />
+        <Route path="alertas" element={<Alertas />} />
+        <Route path="modelo" element={<ModeloRiesgo />} />
         <Route path="parametros" element={<Ajustes />} />
         <Route path="auditoria" element={<Auditoria />} />
         <Route path="cuenta" element={<CuentaAdmin />} />

@@ -11,6 +11,8 @@ import {
   firmarToken,
 } from './auth.js'
 import { rutasInstrumentos } from './instrumentos.js'
+import { rutasPanel } from './panel.js'
+import { recalcularRiesgo } from './servicioRiesgo.js'
 import {
   baseLista,
   consultar,
@@ -367,6 +369,7 @@ app.post(
       ],
     )
     await registrarAuditoria(peticion.usuario.id, 'checkin', fecha)
+    await recalcularRiesgo(peticion.usuario.id, 'registro_diario')
     const fila = await unaFila('SELECT * FROM checkins WHERE usuario_id = $1 AND fecha = $2', [
       peticion.usuario.id,
       fecha,
@@ -484,7 +487,9 @@ app.post(
   asincrono(async (_peticion, respuesta) => {
     await pool.query(
       `TRUNCATE registros, checkins, auditoria, usuarios, codigos_acceso,
-                respuestas_instrumento, preguntas, instrumentos RESTART IDENTITY CASCADE`,
+                respuestas_instrumento, preguntas, instrumentos, evaluaciones_riesgo,
+                lineas_base, alertas, reglas_alerta, estrategias_mitigacion, modelos_riesgo
+                RESTART IDENTITY CASCADE`,
     )
     await pool.query('DELETE FROM ajustes')
     reiniciarInicializacion()
@@ -500,6 +505,7 @@ app.post(
 )
 
 app.use(rutasInstrumentos)
+app.use(rutasPanel)
 
 const raizProyecto = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const carpetaEstatica = path.join(raizProyecto, 'dist')

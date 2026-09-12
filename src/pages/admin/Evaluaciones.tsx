@@ -1,128 +1,159 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useApp } from '../../store/contexto'
 import { api } from '../../lib/api'
-import type { Instrumento, RespuestaInstrumento } from '../../domain/instrumentos'
-import { colorNivel, etiquetaNivel } from '../../domain/catalogos'
+import type { Instrumento, PaginaAplicaciones } from '../../domain/instrumentos'
+
+const TAM = 25
 
 export function EvaluacionesAdmin() {
-  const { usuarios, registros, checkins } = useApp()
-  const [respuestas, setRespuestas] = useState<RespuestaInstrumento[]>([])
+  const [pagina, setPagina] = useState(1)
+  const [instrumento, setInstrumento] = useState('')
+  const [estado, setEstado] = useState<'' | 'borrador' | 'finalizada'>('')
+  const [datos, setDatos] = useState<PaginaAplicaciones | null>(null)
   const [instrumentos, setInstrumentos] = useState<Instrumento[]>([])
   const [error, setError] = useState('')
 
   useEffect(() => {
-    void Promise.all([api.respuestasAdmin(), api.instrumentosAdmin()])
-      .then(([listaRespuestas, listaInstrumentos]) => {
-        setRespuestas(listaRespuestas)
-        setInstrumentos(listaInstrumentos)
-      })
-      .catch((fallo: unknown) =>
-        setError(fallo instanceof Error ? fallo.message : 'No se pudieron cargar las evaluaciones'),
-      )
+    void api
+      .instrumentosAdmin()
+      .then(setInstrumentos)
+      .catch(() => setInstrumentos([]))
   }, [])
 
-  const nombrePersona = useMemo(() => {
-    const mapa = new Map(usuarios.map((usuario) => [usuario.id, usuario]))
-    return (id: string) => {
-      const persona = mapa.get(id)
-      return persona ? `${persona.grado} ${persona.nombre}` : 'Personal no disponible'
-    }
-  }, [usuarios])
+  const cargar = useCallback(() => {
+    // La consulta se resuelve y pagina en base de datos: el navegador nunca recibe el
+    // histórico completo de aplicaciones de toda la población.
+    void api
+      .respuestasAdmin({ pagina, tam: TAM, instrumento, estado: estado || undefined })
+      .then(setDatos)
+      .catch((fallo: unknown) =>
+        setError(fallo instanceof Error ? fallo.message : 'No se pudieron cargar las aplicaciones'),
+      )
+  }, [pagina, instrumento, estado])
 
-  const nombreInstrumento = useMemo(() => {
-    const mapa = new Map(instrumentos.map((item) => [item.id, item.nombre]))
-    return (id: string) => mapa.get(id) ?? 'Instrumento eliminado'
-  }, [instrumentos])
+  useEffect(cargar, [cargar])
 
-  const completas = [...registros].sort((a, b) => b.creadoEn.localeCompare(a.creadoEn))
+  const paginas = datos ? Math.max(1, Math.ceil(datos.total / datos.tam)) : 1
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold text-white">Evaluaciones y resultados</h1>
         <p className="mt-1 text-sm text-slate-400">
-          {completas.length} evaluaciones clínicas · {checkins.length} check-ins · {respuestas.length}{' '}
-          respuestas a test de la unidad
+          Aplicaciones de todos los instrumentos, con su propio puntaje e interpretación.
         </p>
       </div>
 
       {error && <p className="card text-sm text-red-400">{error}</p>}
 
-      <section className="card">
-        <h2 className="section-title">Evaluaciones completas de fatiga</h2>
-        {completas.length === 0 ? (
-          <p className="text-sm text-slate-400">Todavía no hay evaluaciones registradas.</p>
+      <section className="card grid gap-3 sm:grid-cols-3">
+        <div>
+          <label className="label" htmlFor="instrumento">
+            Instrumento
+          </label>
+          <select
+            id="instrumento"
+            className="input"
+            value={instrumento}
+            onChange={(evento) => {
+              setInstrumento(evento.target.value)
+              setPagina(1)
+            }}
+          >
+            <option value="">Todos</option>
+            {instrumentos.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="label" htmlFor="estado">
+            Estado
+          </label>
+          <select
+            id="estado"
+            className="input"
+            value={estado}
+            onChange={(evento) => {
+              setEstado(evento.target.value as '' | 'borrador' | 'finalizada')
+              setPagina(1)
+            }}
+          >
+            <option value="">Todos</option>
+            <option value="finalizada">Finalizadas</option>
+            <option value="borrador">En curso</option>
+          </select>
+        </div>
+        <div className="flex items-end text-sm text-slate-400">
+          {datos ? `${datos.total} aplicaciones registradas` : 'Cargando…'}
+        </div>
+      </section>
+
+      <section className="card overflow-x-auto">
+        {!datos || datos.aplicaciones.length === 0 ? (
+          <p className="text-sm text-slate-400">No hay aplicaciones con estos filtros.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <>
             <table className="w-full text-left text-sm">
               <thead className="text-xs uppercase text-slate-500">
                 <tr>
                   <th className="py-2">Personal</th>
-                  <th>Fecha</th>
-                  <th>Índice</th>
-                  <th>Nivel</th>
-                  <th>Ficha</th>
+                  <th>Instrumento</th>
+                  <th>Estado</th>
+                  <th>Puntaje</th>
+                  <th>Interpretación</th>
+                  <th>Actualizado</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
-                {completas.map((registro) => (
-                  <tr key={registro.id} className="border-t border-white/5">
-                    <td className="py-2 text-slate-300">{nombrePersona(registro.usuarioId)}</td>
-                    <td className="text-slate-400">{registro.creadoEn.slice(0, 10)}</td>
-                    <td className="text-slate-300">{registro.resultado.puntaje}/100</td>
-                    <td>
-                      <span className={`rounded px-2 py-0.5 text-xs ${colorNivel[registro.resultado.nivel]}`}>
-                        {etiquetaNivel[registro.resultado.nivel]}
-                      </span>
+                {datos.aplicaciones.map((aplicacion) => (
+                  <tr key={aplicacion.id} className="border-t border-white/5">
+                    <td className="py-2 text-slate-300">{aplicacion.persona}</td>
+                    <td className="text-slate-400">{aplicacion.instrumentoNombre}</td>
+                    <td className="text-slate-400">
+                      {aplicacion.estado === 'finalizada' ? 'Finalizada' : 'En curso'}
                     </td>
+                    <td className="text-slate-200">{aplicacion.puntaje ?? '—'}</td>
+                    <td className="text-xs text-slate-400">{aplicacion.interpretacion}</td>
+                    <td className="text-xs text-slate-500">{aplicacion.actualizadoEn.slice(0, 10)}</td>
                     <td>
                       <Link
-                        to={`/admin/personal/${registro.usuarioId}`}
+                        to={`/admin/poblacion/${aplicacion.usuarioId}`}
                         className="text-amber-300 hover:underline"
                       >
-                        Ver ficha
+                        Ver detalle
                       </Link>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
-      </section>
 
-      <section className="card">
-        <h2 className="section-title">Test de la unidad respondidos</h2>
-        {respuestas.length === 0 ? (
-          <p className="text-sm text-slate-400">Aún no hay respuestas a los test configurados.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="py-2">Personal</th>
-                  <th>Test</th>
-                  <th>Estado</th>
-                  <th>Puntaje</th>
-                  <th>Actualizado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {respuestas.map((respuesta) => (
-                  <tr key={respuesta.id} className="border-t border-white/5">
-                    <td className="py-2 text-slate-300">{nombrePersona(respuesta.usuarioId)}</td>
-                    <td className="text-slate-400">{nombreInstrumento(respuesta.instrumentoId)}</td>
-                    <td className="text-slate-400">
-                      {respuesta.estado === 'finalizada' ? 'Finalizada' : 'En curso'}
-                    </td>
-                    <td className="text-slate-300">{respuesta.puntaje ?? '—'}</td>
-                    <td className="text-slate-500">{respuesta.actualizadoEn.slice(0, 10)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            <div className="mt-4 flex items-center justify-between text-sm text-slate-400">
+              <span>
+                Página {datos.pagina} de {paginas}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  className="btn-ghost"
+                  disabled={datos.pagina <= 1}
+                  onClick={() => setPagina((previa) => previa - 1)}
+                >
+                  Anterior
+                </button>
+                <button
+                  className="btn-ghost"
+                  disabled={datos.pagina >= paginas}
+                  onClick={() => setPagina((previa) => previa + 1)}
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </section>
     </div>

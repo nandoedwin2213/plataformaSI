@@ -3,10 +3,11 @@ import { useApp } from '../store/contexto'
 
 const enlaces = [
   { ruta: '/admin', texto: 'Dashboard', exacto: true },
-  { ruta: '/admin/personal', texto: 'Personal evaluado' },
+  { ruta: '/admin/poblacion', texto: 'Personal evaluado' },
   { ruta: '/admin/evaluaciones', texto: 'Evaluaciones y resultados' },
-  { ruta: '/admin/tests', texto: 'Test y preguntas' },
-  { ruta: '/admin/estadisticas', texto: 'Estadísticas' },
+  { ruta: '/admin/alertas', texto: 'Alertas' },
+  { ruta: '/admin/tests', texto: 'Instrumentos y preguntas' },
+  { ruta: '/admin/modelo', texto: 'Modelo de riesgo' },
   { ruta: '/admin/parametros', texto: 'Variables y parámetros' },
   { ruta: '/admin/auditoria', texto: 'Auditoría' },
   { ruta: '/admin/cuenta', texto: 'Mi cuenta' },

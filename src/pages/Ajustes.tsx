@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { useApp } from '../store/contexto'
 import type { AjustesInstitucionales } from '../domain/usuarios'
-import { descargarArchivo } from '../lib/almacenamiento'
 
 export function Ajustes() {
-  const { ajustes, actualizarAjustes, reiniciarDatos, usuarios, checkins, registros } = useApp()
+  const { ajustes, actualizarAjustes, reiniciarDatos } = useApp()
   const [borrador, setBorrador] = useState<AjustesInstitucionales>(ajustes)
   const [guardado, setGuardado] = useState(false)
   const [error, setError] = useState('')
@@ -135,23 +134,11 @@ export function Ajustes() {
       <section className="card space-y-4">
         <h2 className="section-title">Datos y respaldo</h2>
         <p className="text-sm text-slate-400">
-          {usuarios.length} usuarios · {checkins.length} check-ins · {registros.length} evaluaciones. Los datos
-          residen en la base PostgreSQL del servidor con auditoría de accesos; para producción falta respaldo
-          centralizado programado.
+          Los datos residen en la base PostgreSQL del servidor con auditoría de accesos; para producción
+          falta respaldo centralizado programado. La exportación masiva no se realiza desde el navegador
+          porque la población puede superar el millar de fichas.
         </p>
         <div className="flex flex-wrap gap-3">
-          <button
-            className="btn-ghost"
-            onClick={() =>
-              descargarArchivo(
-                `respaldo-fatiga-${new Date().toISOString().slice(0, 10)}.json`,
-                JSON.stringify({ ajustes, usuarios, checkins, registros }, null, 2),
-                'application/json',
-              )
-            }
-          >
-            Descargar respaldo JSON
-          </button>
           <button
             className="btn-ghost text-red-300"
             onClick={() => {

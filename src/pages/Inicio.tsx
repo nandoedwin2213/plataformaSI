@@ -41,9 +41,7 @@ export function Inicio() {
   const serieProyectada =
     proyeccion?.dias.map((dia) => ({ etiqueta: dia.fecha.slice(5), valor: dia.puntaje })) ?? []
 
-  const pendientes = instrumentos.filter(
-    (instrumento) => instrumento.tipo === 'personalizado' && instrumento.miRespuesta?.estado !== 'finalizada',
-  )
+  const pendientes = instrumentos.filter((instrumento) => instrumento.disponible)
 
   return (
     <div className="space-y-6">
@@ -116,7 +114,7 @@ export function Inicio() {
               <li key={instrumento.id} className="flex flex-wrap items-center justify-between gap-3">
                 <span className="text-slate-300">{instrumento.nombre}</span>
                 <Link to={`/pruebas/${instrumento.id}`} className="btn-ghost">
-                  {instrumento.miRespuesta ? 'Continuar' : 'Iniciar'}
+                  {instrumento.miBorrador ? 'Continuar' : 'Iniciar'}
                 </Link>
               </li>
             ))}
