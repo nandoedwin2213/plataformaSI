@@ -67,6 +67,13 @@ function CampoPregunta({
         onChange={(evento) =>
           onCambio(evento.target.value === '' ? '' : Number(evento.target.value))
         }
+        onBlur={() => {
+          if (typeof valor !== 'number' || Number.isNaN(valor)) return
+          const minimo = pregunta.minimo ?? -Infinity
+          const maximo = pregunta.maximo ?? Infinity
+          const acotado = Math.min(maximo, Math.max(minimo, valor))
+          if (acotado !== valor) onCambio(acotado)
+        }}
       />
     )
   }
