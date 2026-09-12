@@ -4,13 +4,14 @@ import { useApp } from '../store/contexto'
 import { LineaTendencia, MapaCalor } from '../components/Graficos'
 import { colorNivel, etiquetaNivel } from '../domain/catalogos'
 import { proyectarFatiga } from '../domain/prediccion'
+import { fechaLocal } from '../domain/fechas'
 
 function ultimosDias(cantidad: number): string[] {
   const dias: string[] = []
   for (let indice = cantidad - 1; indice >= 0; indice -= 1) {
     const fecha = new Date()
     fecha.setDate(fecha.getDate() - indice)
-    dias.push(fecha.toISOString().slice(0, 10))
+    dias.push(fechaLocal(fecha))
   }
   return dias
 }

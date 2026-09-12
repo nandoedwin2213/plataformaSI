@@ -1,5 +1,6 @@
 import type { NivelRiesgo } from './types'
 import type { CheckIn, Umbrales } from './usuarios'
+import { fechaLocal } from './fechas'
 
 export interface DiaProyectado {
   fecha: string
@@ -72,7 +73,7 @@ export function proyectarFatiga(
       Math.min(100, Math.round(base + pendiente * dia + (efectoDeuda * dia) / dias)),
     )
     proyectados.push({
-      fecha: fecha.toISOString().slice(0, 10),
+      fecha: fechaLocal(fecha),
       puntaje,
       nivel: nivelPorPuntaje(puntaje, umbrales),
     })

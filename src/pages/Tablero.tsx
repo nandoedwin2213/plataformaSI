@@ -5,13 +5,14 @@ import { BarrasHorizontales, LineaTendencia } from '../components/Graficos'
 import { colorNivel, etiquetaNivel } from '../domain/catalogos'
 import { descargarArchivo } from '../lib/almacenamiento'
 import type { NivelRiesgo } from '../domain/types'
+import { fechaLocal } from '../domain/fechas'
 
 function ultimosDias(cantidad: number): string[] {
   const dias: string[] = []
   for (let indice = cantidad - 1; indice >= 0; indice -= 1) {
     const fecha = new Date()
     fecha.setDate(fecha.getDate() - indice)
-    dias.push(fecha.toISOString().slice(0, 10))
+    dias.push(fechaLocal(fecha))
   }
   return dias
 }
@@ -45,7 +46,7 @@ export function Tablero() {
     return { etiqueta: fecha.slice(5), valor: promedio }
   })
 
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = fechaLocal()
   const checkinsHoy = checkinsFiltrados.filter((item) => item.fecha === hoy)
   const conteoNivel: Record<NivelRiesgo, number> = { bajo: 0, moderado: 0, alto: 0, critico: 0 }
   for (const item of checkinsHoy) conteoNivel[item.nivel] += 1

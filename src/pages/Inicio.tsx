@@ -4,13 +4,14 @@ import { LineaTendencia, MapaCalor } from '../components/Graficos'
 import { colorNivel, etiquetaNivel } from '../domain/catalogos'
 import { proyectarFatiga } from '../domain/prediccion'
 import { DIAS_EVALUACION_COMPLETA, textoDisponibilidad, textoFrecuencia } from '../domain/periodicidad'
+import { fechaLocal } from '../domain/fechas'
 
 function ultimosDias(cantidad: number): string[] {
   const dias: string[] = []
   for (let indice = cantidad - 1; indice >= 0; indice -= 1) {
     const fecha = new Date()
     fecha.setDate(fecha.getDate() - indice)
-    dias.push(fecha.toISOString().slice(0, 10))
+    dias.push(fechaLocal(fecha))
   }
   return dias
 }
@@ -19,7 +20,7 @@ export function Inicio() {
   const { usuarioActual, checkins, registros, instrumentos, ajustes } = useApp()
   if (!usuarioActual) return null
 
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = fechaLocal()
   const mios = checkins
     .filter((item) => item.usuarioId === usuarioActual.id)
     .sort((a, b) => a.fecha.localeCompare(b.fecha))

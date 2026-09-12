@@ -3,6 +3,7 @@ import { autenticar, exigirAdministrador, exigirEvaluado } from './auth.js'
 import { consultar, nuevoId, pool, registrarAuditoria, unaFila } from './db.js'
 import { calcularEstandarizado } from './instrumentosBase.js'
 import { explicar } from './modeloRiesgo.js'
+import { fechaInstitucional } from './fechas.js'
 import {
   actualizarLineaBase,
   estrategiasSugeridas,
@@ -678,7 +679,7 @@ rutasInstrumentos.get(
   asincrono(autenticar),
   exigirAdministrador,
   asincrono(async (_peticion, respuesta) => {
-    const hoy = new Date().toISOString().slice(0, 10)
+    const hoy = fechaInstitucional()
     const fila = await unaFila(
       `SELECT
          (SELECT COUNT(*)::int FROM usuarios WHERE rol = 'evaluado') AS personal,
