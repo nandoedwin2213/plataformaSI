@@ -145,8 +145,8 @@ export function Ajustes() {
         <h2 className="section-title">Datos y respaldo</h2>
         <p className="text-sm text-slate-400">
           {usuarios.length} usuarios · {checkins.length} check-ins · {registros.length} evaluaciones. Los datos
-          residen en la base SQLite del servidor con auditoría de accesos; para producción falta HTTPS y
-          respaldo centralizado programado.
+          residen en la base PostgreSQL del servidor con auditoría de accesos; para producción falta respaldo
+          centralizado programado.
         </p>
         <div className="flex flex-wrap gap-3">
           <button

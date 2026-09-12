@@ -1,17 +1,52 @@
 import { randomUUID } from 'node:crypto'
-import path from 'node:path'
-import fs from 'node:fs'
-import Database from 'better-sqlite3'
+import crypto from 'node:crypto'
+import pg from 'pg'
 import bcrypt from 'bcryptjs'
 
-const RUTA_DATOS = process.env.RUTA_DATOS ?? path.join(process.cwd(), 'datos')
-fs.mkdirSync(RUTA_DATOS, { recursive: true })
+const cadena = process.env.DATABASE_URL
+if (!cadena) {
+  throw new Error('Falta DATABASE_URL con la cadena de conexión de PostgreSQL')
+}
 
-export const db = new Database(path.join(RUTA_DATOS, 'fatiga.db'))
-db.pragma('journal_mode = WAL')
-db.pragma('foreign_keys = ON')
+export const pool = new pg.Pool({
+  connectionString: cadena,
+  ssl: cadena.includes('sslmode=disable') ? false : { rejectUnauthorized: false },
+  max: Number(process.env.PG_MAX_CONEXIONES ?? 5),
+})
 
-db.exec(`
+export async function consultar(sql, parametros = []) {
+  const { rows } = await pool.query(sql, parametros)
+  return rows
+}
+
+export async function unaFila(sql, parametros = []) {
+  const filas = await consultar(sql, parametros)
+  return filas[0] ?? null
+}
+
+export const ajustesPorDefecto = {
+  institucion: 'Fuerza Aérea Ecuatoriana',
+  unidadPorDefecto: 'Ala de Combate N.º 23',
+  umbrales: { moderado: 20, alto: 40, critico: 60 },
+  jornadaReferencia: 8,
+  alertasActivas: true,
+  retencionDias: 365,
+}
+
+const perfilVacio = {
+  fechaNacimiento: '',
+  pesoKg: 75,
+  tallaCm: 172,
+  antecedentes: [],
+  antecedentesOtros: '',
+  funcionPrincipal: '',
+  funcionSecundaria: '',
+  cargoPrincipal: '',
+  cargoAdicional: '',
+}
+
+export async function crearEsquema() {
+  await pool.query(`
 CREATE TABLE IF NOT EXISTS usuarios (
   id TEXT PRIMARY KEY,
   usuario TEXT NOT NULL UNIQUE,
@@ -20,7 +55,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   grado TEXT NOT NULL,
   unidad TEXT NOT NULL,
   rol TEXT NOT NULL CHECK (rol IN ('piloto','medico','operaciones','admin')),
-  activo INTEGER NOT NULL DEFAULT 1,
+  activo BOOLEAN NOT NULL DEFAULT TRUE,
   perfil TEXT NOT NULL DEFAULT '{}',
   creado_en TEXT NOT NULL
 );
@@ -30,12 +65,12 @@ CREATE TABLE IF NOT EXISTS checkins (
   usuario_id TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
   fecha TEXT NOT NULL,
   creado_en TEXT NOT NULL,
-  horas_sueno REAL NOT NULL,
-  horas_despierto REAL NOT NULL,
+  horas_sueno DOUBLE PRECISION NOT NULL,
+  horas_despierto DOUBLE PRECISION NOT NULL,
   kss INTEGER NOT NULL,
   samn_perelli INTEGER NOT NULL,
-  vuelo_programado INTEGER NOT NULL,
-  vuelo_nocturno INTEGER NOT NULL,
+  vuelo_programado BOOLEAN NOT NULL,
+  vuelo_nocturno BOOLEAN NOT NULL,
   notas TEXT NOT NULL DEFAULT '',
   puntaje INTEGER NOT NULL,
   nivel TEXT NOT NULL,
@@ -63,38 +98,20 @@ CREATE TABLE IF NOT EXISTS auditoria (
   creado_en TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS configuracion (
+  clave TEXT PRIMARY KEY,
+  valor TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_checkins_usuario ON checkins(usuario_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_registros_usuario ON registros(usuario_id, creado_en);
 `)
-
-export const ajustesPorDefecto = {
-  institucion: 'Fuerza Aérea Ecuatoriana',
-  unidadPorDefecto: 'Ala de Combate N.º 23',
-  umbrales: { moderado: 20, alto: 40, critico: 60 },
-  jornadaReferencia: 8,
-  alertasActivas: true,
-  retencionDias: 365,
 }
 
-const perfilVacio = {
-  fechaNacimiento: '',
-  pesoKg: 75,
-  tallaCm: 172,
-  antecedentes: [],
-  antecedentesOtros: '',
-  funcionPrincipal: '',
-  funcionSecundaria: '',
-  cargoPrincipal: '',
-  cargoAdicional: '',
-}
-
-export function registrarAuditoria(usuarioId, accion, detalle = '') {
-  db.prepare('INSERT INTO auditoria (id, usuario_id, accion, detalle, creado_en) VALUES (?,?,?,?,?)').run(
-    randomUUID(),
-    usuarioId,
-    accion,
-    detalle,
-    new Date().toISOString(),
+export async function registrarAuditoria(usuarioId, accion, detalle = '') {
+  await pool.query(
+    'INSERT INTO auditoria (id, usuario_id, accion, detalle, creado_en) VALUES ($1,$2,$3,$4,$5)',
+    [randomUUID(), usuarioId, accion, detalle, new Date().toISOString()],
   )
 }
 
@@ -182,13 +199,7 @@ const usuariosDemo = [
   },
 ]
 
-function sembrarCheckins(usuarioId, semilla) {
-  const insertar = db.prepare(
-    `INSERT OR IGNORE INTO checkins
-     (id, usuario_id, fecha, creado_en, horas_sueno, horas_despierto, kss, samn_perelli,
-      vuelo_programado, vuelo_nocturno, notas, puntaje, nivel)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-  )
+async function sembrarCheckins(usuarioId, semilla) {
   for (let indice = 13; indice >= 1; indice -= 1) {
     const fecha = new Date()
     fecha.setDate(fecha.getDate() - indice)
@@ -199,60 +210,90 @@ function sembrarCheckins(usuarioId, semilla) {
     const kss = Math.max(1, Math.min(9, Math.round(4 + onda * 2 + semilla * 0.5)))
     const samnPerelli = Math.max(1, Math.min(7, Math.round(3 + onda * 1.5)))
     const vueloNocturno = indice % 7 === semilla % 7
-    const datos = { horasSueno, horasDespierto, kss, samnPerelli, vueloNocturno }
-    const puntaje = puntajeCheckin(datos)
-    insertar.run(
-      randomUUID(),
-      usuarioId,
-      dia,
-      fecha.toISOString(),
-      horasSueno,
-      horasDespierto,
-      kss,
-      samnPerelli,
-      1,
-      vueloNocturno ? 1 : 0,
-      '',
-      puntaje,
-      nivelPorPuntaje(puntaje),
+    const puntaje = puntajeCheckin({ horasSueno, horasDespierto, kss, samnPerelli, vueloNocturno })
+    await pool.query(
+      `INSERT INTO checkins
+         (id, usuario_id, fecha, creado_en, horas_sueno, horas_despierto, kss, samn_perelli,
+          vuelo_programado, vuelo_nocturno, notas, puntaje, nivel)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       ON CONFLICT (usuario_id, fecha) DO NOTHING`,
+      [
+        randomUUID(),
+        usuarioId,
+        dia,
+        fecha.toISOString(),
+        horasSueno,
+        horasDespierto,
+        kss,
+        samnPerelli,
+        true,
+        vueloNocturno,
+        '',
+        puntaje,
+        nivelPorPuntaje(puntaje),
+      ],
     )
   }
 }
 
-export function inicializarDatos() {
-  const fila = db.prepare('SELECT datos FROM ajustes WHERE id = 1').get()
-  if (!fila) {
-    db.prepare('INSERT INTO ajustes (id, datos) VALUES (1, ?)').run(JSON.stringify(ajustesPorDefecto))
-  }
+export async function inicializarDatos() {
+  await crearEsquema()
 
-  const total = db.prepare('SELECT COUNT(*) AS total FROM usuarios').get().total
+  await pool.query('INSERT INTO ajustes (id, datos) VALUES (1, $1) ON CONFLICT (id) DO NOTHING', [
+    JSON.stringify(ajustesPorDefecto),
+  ])
+
+  const { total } = await unaFila('SELECT COUNT(*)::int AS total FROM usuarios')
   if (total > 0) return
 
-  const insertar = db.prepare(
-    `INSERT INTO usuarios (id, usuario, clave_hash, nombre, grado, unidad, rol, activo, perfil, creado_en)
-     VALUES (?,?,?,?,?,?,?,1,?,?)`,
-  )
-  usuariosDemo.forEach((demo, indice) => {
+  for (const [indice, demo] of usuariosDemo.entries()) {
     const id = randomUUID()
-    insertar.run(
-      id,
-      demo.usuario,
-      bcrypt.hashSync(demo.clave, 10),
-      demo.nombre,
-      demo.grado,
-      demo.unidad,
-      demo.rol,
-      JSON.stringify(demo.perfil),
-      new Date().toISOString(),
+    await pool.query(
+      `INSERT INTO usuarios (id, usuario, clave_hash, nombre, grado, unidad, rol, activo, perfil, creado_en)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,TRUE,$8,$9)`,
+      [
+        id,
+        demo.usuario,
+        bcrypt.hashSync(demo.clave, 10),
+        demo.nombre,
+        demo.grado,
+        demo.unidad,
+        demo.rol,
+        JSON.stringify(demo.perfil),
+        new Date().toISOString(),
+      ],
     )
-    if (demo.rol === 'piloto') sembrarCheckins(id, indice + 1)
-  })
-  registrarAuditoria(null, 'semilla', 'Datos de demostración creados')
+    if (demo.rol === 'piloto') await sembrarCheckins(id, indice + 1)
+  }
+  await registrarAuditoria(null, 'semilla', 'Datos de demostración creados')
 }
 
-export function leerAjustes() {
-  const fila = db.prepare('SELECT datos FROM ajustes WHERE id = 1').get()
+let inicializacion = null
+
+export function baseLista() {
+  if (!inicializacion) inicializacion = inicializarDatos()
+  return inicializacion
+}
+
+export function reiniciarInicializacion() {
+  inicializacion = null
+}
+
+export async function leerAjustes() {
+  const fila = await unaFila('SELECT datos FROM ajustes WHERE id = 1')
   return fila ? JSON.parse(fila.datos) : ajustesPorDefecto
+}
+
+export async function secretoJwt() {
+  if (process.env.JWT_SECRETO) return process.env.JWT_SECRETO
+  await crearEsquema()
+  const generado = crypto.randomBytes(48).toString('hex')
+  await pool.query(
+    "INSERT INTO configuracion (clave, valor) VALUES ('jwt_secreto', $1) ON CONFLICT (clave) DO NOTHING",
+    [generado],
+  )
+  const fila = await unaFila("SELECT valor FROM configuracion WHERE clave = 'jwt_secreto'")
+  return fila.valor
 }
 
 export function nuevoId() {
