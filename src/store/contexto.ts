@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 import type { RegistroHistorial } from '../domain/types'
 import type { AjustesInstitucionales, CheckIn, Usuario } from '../domain/usuarios'
-import type { DatosCheckIn, DatosNuevoUsuario } from '../lib/api'
+import type { DatosCheckIn, DatosNuevoUsuario, ModoAcceso, RespuestaCodigo } from '../lib/api'
 
 export interface EstadoApp {
   usuarioActual: Usuario | null
@@ -10,13 +10,17 @@ export interface EstadoApp {
   checkins: CheckIn[]
   ajustes: AjustesInstitucionales
   sinConexion: boolean
-  iniciarSesion: (usuario: string, clave: string) => Promise<string | null>
+  solicitarCodigo: (
+    correo: string,
+    modo: ModoAcceso,
+  ) => Promise<{ datos: RespuestaCodigo | null; error: string | null }>
+  ingresarConCodigo: (correo: string, codigo: string) => Promise<string | null>
   cerrarSesion: () => void
   guardarRegistro: (datos: Pick<RegistroHistorial, 'evaluacion' | 'resultado'>) => Promise<void>
   eliminarRegistro: (id: string) => Promise<void>
   guardarCheckin: (datos: DatosCheckIn) => Promise<void>
   crearUsuario: (datos: DatosNuevoUsuario) => Promise<string | null>
-  actualizarUsuario: (id: string, datos: Partial<Usuario> & { clave?: string }) => Promise<void>
+  actualizarUsuario: (id: string, datos: Partial<Usuario>) => Promise<void>
   eliminarUsuario: (id: string) => Promise<void>
   actualizarAjustes: (ajustes: AjustesInstitucionales) => Promise<string | null>
   reiniciarDatos: () => Promise<void>

@@ -6,6 +6,7 @@ import { Inicio } from './pages/Inicio'
 import { CheckInDiario } from './pages/CheckInDiario'
 import { Evaluacion } from './pages/Evaluacion'
 import { Ficha } from './pages/Ficha'
+import { MiFicha } from './pages/MiFicha'
 import { HistorialPagina } from './pages/HistorialPagina'
 import { Tablero } from './pages/Tablero'
 import { Personal } from './pages/Personal'
@@ -35,6 +36,7 @@ export default function App() {
         }
       >
         <Route path="/inicio" element={<Inicio />} />
+        <Route path="/perfil" element={<MiFicha />} />
         <Route path="/checkin" element={<CheckInDiario />} />
         <Route path="/evaluacion" element={<Evaluacion />} />
         <Route path="/ficha" element={<Ficha />} />
@@ -43,7 +45,7 @@ export default function App() {
         <Route
           path="/tablero"
           element={
-            <Protegida roles={['medico', 'operaciones', 'admin']}>
+            <Protegida roles={['admin']}>
               <Tablero />
             </Protegida>
           }
@@ -51,7 +53,7 @@ export default function App() {
         <Route
           path="/personal"
           element={
-            <Protegida roles={['operaciones', 'admin']}>
+            <Protegida roles={['admin']}>
               <Personal />
             </Protegida>
           }

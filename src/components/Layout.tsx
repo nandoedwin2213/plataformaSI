@@ -9,15 +9,16 @@ interface Enlace {
 }
 
 const enlaces: Enlace[] = [
-  { ruta: '/inicio', texto: 'Inicio', roles: ['piloto', 'medico', 'operaciones', 'admin'] },
-  { ruta: '/checkin', texto: 'Check-in diario', roles: ['piloto', 'medico', 'operaciones', 'admin'] },
-  { ruta: '/evaluacion', texto: 'Evaluación completa', roles: ['piloto', 'medico', 'operaciones', 'admin'] },
-  { ruta: '/ficha', texto: 'Mi ficha longitudinal', roles: ['piloto', 'medico', 'operaciones', 'admin'] },
-  { ruta: '/historial', texto: 'Historial', roles: ['piloto', 'medico', 'operaciones', 'admin'] },
-  { ruta: '/tablero', texto: 'Tablero de escuadrón', roles: ['medico', 'operaciones', 'admin'] },
-  { ruta: '/personal', texto: 'Personal', roles: ['operaciones', 'admin'] },
-  { ruta: '/ajustes', texto: 'Ajustes', roles: ['admin'] },
-  { ruta: '/guia', texto: 'Guía clínica', roles: ['piloto', 'medico', 'operaciones', 'admin'] },
+  { ruta: '/inicio', texto: 'Inicio', roles: ['evaluado', 'admin'] },
+  { ruta: '/perfil', texto: 'Mi ficha personal', roles: ['evaluado'] },
+  { ruta: '/checkin', texto: 'Check-in diario', roles: ['evaluado'] },
+  { ruta: '/evaluacion', texto: 'Evaluación completa', roles: ['evaluado'] },
+  { ruta: '/ficha', texto: 'Mi ficha longitudinal', roles: ['evaluado'] },
+  { ruta: '/historial', texto: 'Historial', roles: ['evaluado', 'admin'] },
+  { ruta: '/tablero', texto: 'Tablero institucional', roles: ['admin'] },
+  { ruta: '/personal', texto: 'Personal evaluado', roles: ['admin'] },
+  { ruta: '/ajustes', texto: 'Ajustes y auditoría', roles: ['admin'] },
+  { ruta: '/guia', texto: 'Guía clínica', roles: ['evaluado', 'admin'] },
 ]
 
 export function Layout() {
@@ -61,7 +62,8 @@ export function Layout() {
               {usuarioActual.grado} {usuarioActual.nombre}
             </p>
             <p className="text-xs text-slate-400">
-              {usuarioActual.unidad} · {usuarioActual.rol}
+              {usuarioActual.correo} ·{' '}
+              {usuarioActual.rol === 'admin' ? 'Administrador' : 'Personal evaluado'}
             </p>
           </div>
           <button

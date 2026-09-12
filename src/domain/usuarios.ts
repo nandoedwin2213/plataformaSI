@@ -1,8 +1,11 @@
 import type { Evaluacion, NivelRiesgo } from './types'
 
-export type Rol = 'piloto' | 'medico' | 'operaciones' | 'admin'
+export type Rol = 'evaluado' | 'admin'
 
 export interface PerfilUsuario {
+  nombres: string
+  apellidos: string
+  cedula: string
   fechaNacimiento: string
   pesoKg: number
   tallaCm: number
@@ -17,6 +20,7 @@ export interface PerfilUsuario {
 export interface Usuario {
   id: string
   usuario: string
+  correo: string
   nombre: string
   grado: string
   unidad: string
@@ -58,14 +62,16 @@ export interface AjustesInstitucionales {
 }
 
 export const rolesDisponibles: { valor: Rol; texto: string; descripcion: string }[] = [
-  { valor: 'piloto', texto: 'Piloto / tripulante', descripcion: 'Check-in diario y evaluaciones propias' },
-  { valor: 'medico', texto: 'Médico de aviación', descripcion: 'Acceso clínico al personal y alertas' },
   {
-    valor: 'operaciones',
-    texto: 'Jefe de operaciones',
-    descripcion: 'Tablero de escuadrón y planificación de relevos',
+    valor: 'evaluado',
+    texto: 'Personal evaluado',
+    descripcion: 'Ficha personal, check-in diario y evaluaciones propias',
   },
-  { valor: 'admin', texto: 'Administrador', descripcion: 'Gestión de usuarios y parámetros del sistema' },
+  {
+    valor: 'admin',
+    texto: 'Administrador',
+    descripcion: 'Panel institucional, gestión de personal, ajustes y auditoría',
+  },
 ]
 
 export const ajustesPorDefecto: AjustesInstitucionales = {
@@ -78,6 +84,9 @@ export const ajustesPorDefecto: AjustesInstitucionales = {
 }
 
 export const perfilVacio: PerfilUsuario = {
+  nombres: '',
+  apellidos: '',
+  cedula: '',
   fechaNacimiento: '',
   pesoKg: 75,
   tallaCm: 172,

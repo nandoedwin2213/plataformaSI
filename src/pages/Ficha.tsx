@@ -48,7 +48,7 @@ export function Ficha() {
   }
 
   const esPropia = persona.id === usuarioActual.id
-  if (!esPropia && usuarioActual.rol === 'piloto') {
+  if (!esPropia && usuarioActual.rol !== 'admin') {
     return <p className="card text-sm text-slate-400">Solo puedes consultar tu propia ficha.</p>
   }
 
@@ -83,7 +83,7 @@ export function Ficha() {
             Ficha longitudinal · {persona.grado} {persona.nombre}
           </h1>
           <p className="mt-1 text-sm text-slate-400">
-            {persona.unidad} · @{persona.usuario}
+            {persona.unidad} · {persona.correo}
             {edad !== null && ` · ${edad} años`}
             {imc !== null && ` · IMC ${imc}`}
           </p>
@@ -92,7 +92,7 @@ export function Ficha() {
           <button className="btn-ghost" onClick={() => window.print()}>
             Imprimir informe
           </button>
-          {usuarioActual.rol !== 'piloto' && (
+          {usuarioActual.rol === 'admin' && (
             <Link to="/tablero" className="btn-ghost">
               Volver al tablero
             </Link>

@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import crypto from 'node:crypto'
 import pg from 'pg'
-import bcrypt from 'bcryptjs'
 
 const cadena = process.env.DATABASE_URL
 if (!cadena) {
@@ -24,6 +23,12 @@ export async function unaFila(sql, parametros = []) {
   return filas[0] ?? null
 }
 
+export const CORREO_ADMIN = (process.env.ADMIN_EMAIL ?? 'nandoedwin2213@gmail.com').trim().toLowerCase()
+
+export function esCorreoAdmin(correo) {
+  return typeof correo === 'string' && correo.trim().toLowerCase() === CORREO_ADMIN
+}
+
 export const ajustesPorDefecto = {
   institucion: 'Fuerza Aérea Ecuatoriana',
   unidadPorDefecto: 'Ala de Combate N.º 23',
@@ -34,6 +39,9 @@ export const ajustesPorDefecto = {
 }
 
 const perfilVacio = {
+  nombres: '',
+  apellidos: '',
+  cedula: '',
   fechaNacimiento: '',
   pesoKg: 75,
   tallaCm: 172,
@@ -54,7 +62,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   nombre TEXT NOT NULL,
   grado TEXT NOT NULL,
   unidad TEXT NOT NULL,
-  rol TEXT NOT NULL CHECK (rol IN ('piloto','medico','operaciones','admin')),
+  rol TEXT NOT NULL,
   activo BOOLEAN NOT NULL DEFAULT TRUE,
   perfil TEXT NOT NULL DEFAULT '{}',
   creado_en TEXT NOT NULL
@@ -103,8 +111,59 @@ CREATE TABLE IF NOT EXISTS configuracion (
   valor TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS codigos_acceso (
+  id TEXT PRIMARY KEY,
+  correo TEXT NOT NULL,
+  codigo_hash TEXT NOT NULL,
+  rol TEXT NOT NULL,
+  expira_en TEXT NOT NULL,
+  creado_en TEXT NOT NULL,
+  usado_en TEXT,
+  intentos INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE INDEX IF NOT EXISTS idx_checkins_usuario ON checkins(usuario_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_registros_usuario ON registros(usuario_id, creado_en);
+CREATE INDEX IF NOT EXISTS idx_codigos_correo ON codigos_acceso(correo, creado_en);
+`)
+
+  await migrarAccesoPorCorreo()
+}
+
+async function migrarAccesoPorCorreo() {
+  await pool.query(`
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS correo TEXT;
+ALTER TABLE usuarios ALTER COLUMN clave_hash DROP NOT NULL;
+ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_rol_check;
+`)
+
+  await pool.query("UPDATE usuarios SET rol = 'evaluado' WHERE rol <> 'admin'")
+  await pool.query(
+    `UPDATE usuarios SET rol = 'evaluado', correo = NULL
+       WHERE rol = 'admin'
+         AND id <> (SELECT id FROM usuarios WHERE rol = 'admin' ORDER BY creado_en LIMIT 1)`,
+  )
+  await pool.query("UPDATE usuarios SET correo = $1 WHERE rol = 'admin'", [CORREO_ADMIN])
+  await pool.query("UPDATE usuarios SET correo = NULL WHERE rol <> 'admin' AND lower(correo) = $1", [
+    CORREO_ADMIN,
+  ])
+  await pool.query(`
+UPDATE usuarios
+   SET correo = CASE
+     WHEN usuario LIKE '%@%' THEN lower(usuario)
+     ELSE lower(usuario) || '@demo.plataformasi.mil.ec'
+   END
+ WHERE rol = 'evaluado' AND (correo IS NULL OR correo = '')`)
+
+  await pool.query(`
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'usuarios_rol_check') THEN
+    ALTER TABLE usuarios ADD CONSTRAINT usuarios_rol_check CHECK (rol IN ('evaluado','admin'));
+  END IF;
+END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_unico_admin ON usuarios ((rol)) WHERE rol = 'admin';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_correo ON usuarios (lower(correo)) WHERE correo IS NOT NULL;
 `)
 }
 
@@ -137,14 +196,16 @@ function puntajeCheckin({ horasSueno, horasDespierto, kss, samnPerelli, vueloNoc
 
 const usuariosDemo = [
   {
-    usuario: 'piloto',
-    clave: 'piloto123',
+    correo: 'luis.vasconez@demo.plataformasi.mil.ec',
     nombre: 'Vásconez Andrade Luis',
     grado: 'Teniente',
     unidad: 'Ala de Combate N.º 23',
-    rol: 'piloto',
+    rol: 'evaluado',
+    conHistorial: true,
     perfil: {
       ...perfilVacio,
+      nombres: 'Luis',
+      apellidos: 'Vásconez Andrade',
       fechaNacimiento: '1992-04-18',
       pesoKg: 78,
       tallaCm: 175,
@@ -155,14 +216,16 @@ const usuariosDemo = [
     },
   },
   {
-    usuario: 'piloto2',
-    clave: 'piloto123',
+    correo: 'maria.cedeno@demo.plataformasi.mil.ec',
     nombre: 'Cedeño Ríos María',
     grado: 'Capitán',
     unidad: 'Ala de Transportes N.º 11',
-    rol: 'piloto',
+    rol: 'evaluado',
+    conHistorial: true,
     perfil: {
       ...perfilVacio,
+      nombres: 'María',
+      apellidos: 'Cedeño Ríos',
       fechaNacimiento: '1989-11-02',
       pesoKg: 62,
       tallaCm: 165,
@@ -171,26 +234,7 @@ const usuariosDemo = [
     },
   },
   {
-    usuario: 'operaciones',
-    clave: 'ops123',
-    nombre: 'Jefe de Operaciones',
-    grado: 'Teniente Coronel',
-    unidad: 'Ala de Combate N.º 23',
-    rol: 'operaciones',
-    perfil: { ...perfilVacio, funcionPrincipal: 'Jefatura de operaciones' },
-  },
-  {
-    usuario: 'medico',
-    clave: 'med123',
-    nombre: 'Médico de Aviación',
-    grado: 'Mayor',
-    unidad: 'Servicio de Medicina Aeroespacial',
-    rol: 'medico',
-    perfil: { ...perfilVacio, funcionPrincipal: 'Medicina aeroespacial' },
-  },
-  {
-    usuario: 'admin',
-    clave: 'admin123',
+    correo: CORREO_ADMIN,
     nombre: 'Administrador del sistema',
     grado: 'Coronel',
     unidad: 'Comando de Educación y Doctrina',
@@ -236,6 +280,32 @@ async function sembrarCheckins(usuarioId, semilla) {
   }
 }
 
+export async function asegurarAdministrador() {
+  const existente = await unaFila("SELECT id FROM usuarios WHERE rol = 'admin'")
+  if (existente) return existente.id
+
+  const porCorreo = await unaFila('SELECT id FROM usuarios WHERE lower(correo) = $1', [CORREO_ADMIN])
+  if (porCorreo) {
+    await pool.query("UPDATE usuarios SET rol = 'admin', activo = TRUE WHERE id = $1", [porCorreo.id])
+    return porCorreo.id
+  }
+
+  const id = randomUUID()
+  await pool.query(
+    `INSERT INTO usuarios (id, usuario, clave_hash, correo, nombre, grado, unidad, rol, activo, perfil, creado_en)
+     VALUES ($1,$2,NULL,$3,$4,'','','admin',TRUE,$5,$6)`,
+    [
+      id,
+      CORREO_ADMIN,
+      CORREO_ADMIN,
+      'Administrador del sistema',
+      JSON.stringify(perfilVacio),
+      new Date().toISOString(),
+    ],
+  )
+  return id
+}
+
 export async function inicializarDatos() {
   await crearEsquema()
 
@@ -244,17 +314,21 @@ export async function inicializarDatos() {
   ])
 
   const { total } = await unaFila('SELECT COUNT(*)::int AS total FROM usuarios')
-  if (total > 0) return
+  if (total > 0) {
+    await asegurarAdministrador()
+    return
+  }
 
   for (const [indice, demo] of usuariosDemo.entries()) {
     const id = randomUUID()
     await pool.query(
-      `INSERT INTO usuarios (id, usuario, clave_hash, nombre, grado, unidad, rol, activo, perfil, creado_en)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,TRUE,$8,$9)`,
+      `INSERT INTO usuarios (id, usuario, clave_hash, correo, nombre, grado, unidad, rol, activo, perfil, creado_en)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,TRUE,$9,$10)`,
       [
         id,
-        demo.usuario,
-        bcrypt.hashSync(demo.clave, 10),
+        demo.correo,
+        null,
+        demo.correo,
         demo.nombre,
         demo.grado,
         demo.unidad,
@@ -263,7 +337,7 @@ export async function inicializarDatos() {
         new Date().toISOString(),
       ],
     )
-    if (demo.rol === 'piloto') await sembrarCheckins(id, indice + 1)
+    if (demo.conHistorial) await sembrarCheckins(id, indice + 1)
   }
   await registrarAuditoria(null, 'semilla', 'Datos de demostración creados')
 }

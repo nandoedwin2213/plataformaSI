@@ -5,7 +5,7 @@ export function HistorialPagina() {
   const { usuarioActual, registros, eliminarRegistro, usuarios } = useApp()
   if (!usuarioActual) return null
 
-  const esMando = usuarioActual.rol !== 'piloto'
+  const esMando = usuarioActual.rol === 'admin'
   const visibles = esMando
     ? registros
     : registros.filter((registro) => registro.usuarioId === usuarioActual.id)
