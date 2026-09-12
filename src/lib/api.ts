@@ -148,6 +148,11 @@ export const api = {
     pedir<AjustesInstitucionales>('/api/ajustes', { method: 'PUT', body: JSON.stringify(datos) }),
   auditoria: () => pedir<RegistroAuditoria[]>('/api/auditoria'),
   reiniciar: () => pedir<{ estado: string }>('/api/reiniciar', { method: 'POST' }),
+  reiniciarDatosEvaluados: () =>
+    pedir<{ evaluados: number; aplicaciones: number; checkins: number }>('/api/admin/datos/reiniciar', {
+      method: 'POST',
+      body: JSON.stringify({ confirmacion: 'BORRAR DATOS' }),
+    }),
 
   // Instrumentos configurables: lectura y respuesta del evaluado
   instrumentos: () => pedir<InstrumentoDisponible[]>('/api/instrumentos'),

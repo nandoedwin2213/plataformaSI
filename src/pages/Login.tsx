@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../store/contexto'
 import type { ModoAcceso } from '../lib/api'
+import { Ambiente, BotonTema } from '../components/Tema'
+import { useTema } from '../lib/tema'
 
 const opciones: { modo: ModoAcceso; titulo: string; descripcion: string }[] = [
   {
@@ -19,6 +21,7 @@ const opciones: { modo: ModoAcceso; titulo: string; descripcion: string }[] = [
 export function Login() {
   const { solicitarCodigo, ingresarConCodigo, ajustes, sinConexion } = useApp()
   const navegar = useNavigate()
+  const { tema, alternar } = useTema()
   const [modo, setModo] = useState<ModoAcceso | null>(null)
   const [etapa, setEtapa] = useState<'correo' | 'codigo'>('correo')
   const [correo, setCorreo] = useState('')
@@ -69,6 +72,10 @@ export function Login() {
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4 py-10">
+      <Ambiente />
+      <div className="fixed right-4 top-4">
+        <BotonTema tema={tema} onAlternar={alternar} />
+      </div>
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
           <p className="text-xs uppercase tracking-[0.35em] text-cyan-400">{ajustes.institucion}</p>
